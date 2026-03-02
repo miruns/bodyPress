@@ -176,12 +176,12 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
                           : const Center(child: _ZenLoader()))
                     : _entries.isEmpty
                     ? _emptyState(dark)
-                    : Stack(
+                    : Column(
                         children: [
-                          Column(
-                            children: [
-                              Expanded(
-                                child: PageView.builder(
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                PageView.builder(
                                   controller: _pageCtrl,
                                   itemCount: _entries.length,
                                   onPageChanged: (i) {
@@ -200,34 +200,37 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
                                         _showHistory(context, _entries[i].date),
                                   ),
                                 ),
-                              ),
-                              _DateNav(
-                                entries: _entries,
-                                current: _currentPage,
-                                onPrev: () => _goPage(_currentPage - 1),
-                                onNext: () => _goPage(_currentPage + 1),
-                              ),
-                            ],
-                          ),
-                          // Floating "Today" pill — visible only when away from today
-                          if (_currentPage > 0)
-                            Positioned(
-                              bottom: 72,
-                              left: 0,
-                              right: 0,
-                              child: Center(child: _TodayPill(onTap: _goToday)),
-                            ),
 
-                          // Floating share FAB — bottom-right, always reachable
-                          Positioned(
-                            bottom: 20,
-                            right: 20,
-                            child: _ShareFab(
-                              sharing: _sharing,
-                              onShare: _entries.isNotEmpty
-                                  ? _shareCurrentEntry
-                                  : null,
+                                // Floating "Today" pill — visible only when away from today
+                                if (_currentPage > 0)
+                                  Positioned(
+                                    bottom: 16,
+                                    left: 0,
+                                    right: 0,
+                                    child: Center(
+                                      child: _TodayPill(onTap: _goToday),
+                                    ),
+                                  ),
+
+                                // Floating share FAB — bottom-right, clears DateNav
+                                Positioned(
+                                  bottom: 16,
+                                  right: 20,
+                                  child: _ShareFab(
+                                    sharing: _sharing,
+                                    onShare: _entries.isNotEmpty
+                                        ? _shareCurrentEntry
+                                        : null,
+                                  ),
+                                ),
+                              ],
                             ),
+                          ),
+                          _DateNav(
+                            entries: _entries,
+                            current: _currentPage,
+                            onPrev: () => _goPage(_currentPage - 1),
+                            onNext: () => _goPage(_currentPage + 1),
                           ),
                         ],
                       ),
