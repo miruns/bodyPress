@@ -31,12 +31,27 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
   bool _loading = true;
   bool _refreshing = false;
   bool _loadingMore = false;
+  bool _isFirstVisit = false;
   static const int _pageSize = 7;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _initWithFirstVisitCheck();
+  }
+
+  /// Check for first-time use (empty DB) before loading, so we can show
+  /// the immersive bootstrap experience instead of the generic spinner.
+  Future<void> _initWithFirstVisitCheck() async {
+    try {
+      final db = ref.read(localDbServiceProvider);
+      final hasData = await db.hasAnyEntries();
+      if (!hasData && mounted) {
+        setState(() => _isFirstVisit = true);
+      }
+    } catch (_) {}
+    await _load();
+    if (mounted) setState(() => _isFirstVisit = false);
   }
 
   @override
@@ -153,7 +168,9 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
               const HealthPermissionCard(),
               Expanded(
                 child: _loading
-                    ? const Center(child: _ZenLoader())
+                    ? (_isFirstVisit
+                          ? const _FirstVisitBootstrap()
+                          : const Center(child: _ZenLoader()))
                     : _entries.isEmpty
                     ? _emptyState(dark)
                     : Stack(
@@ -943,6 +960,422 @@ class _ZenLoaderState extends State<_ZenLoader>
           ],
         );
       },
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  FIRST-VISIT BOOTSTRAP — immersive pipeline shown on very first app open
+// ═════════════════════════════════════════════════════════════════════════════
+
+enum _StageState { pending, active, done }
+
+class _FirstVisitBootstrap extends StatefulWidget {
+  const _FirstVisitBootstrap();
+
+  @override
+  State<_FirstVisitBootstrap> createState() => _FirstVisitBootstrapState();
+}
+
+class _FirstVisitBootstrapState extends State<_FirstVisitBootstrap>
+    with TickerProviderStateMixin {
+  late final AnimationController _breatheCtrl;
+  late final AnimationController _shimmerCtrl;
+  late final List<AnimationController> _fadeCtrls;
+  late final List<Animation<double>> _fadeAnims;
+
+  int _stageIndex = 0;
+  Timer? _stageTimer;
+
+  // Approx wall-clock for each stage before auto-advancing.
+  static const _stageDurations = [
+    Duration(seconds: 6), // Sensing  — sensor reads
+    Duration(seconds: 28), // Writing  — AI call
+    Duration(seconds: 60), // Patterns — belt-and-suspenders
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _breatheCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3600),
+    )..repeat(reverse: true);
+
+    _shimmerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+
+    // One fade controller per stage — staggered entry animation.
+    _fadeCtrls = List.generate(
+      3,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      ),
+    );
+    _fadeAnims = _fadeCtrls
+        .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOut))
+        .toList();
+
+    _fadeCtrls[0].forward();
+    Future.delayed(const Duration(milliseconds: 180), () {
+      if (mounted) _fadeCtrls[1].forward();
+    });
+    Future.delayed(const Duration(milliseconds: 360), () {
+      if (mounted) _fadeCtrls[2].forward();
+    });
+
+    _scheduleStageAdvance();
+  }
+
+  void _scheduleStageAdvance() {
+    if (_stageIndex >= _stageDurations.length - 1) return;
+    _stageTimer = Timer(_stageDurations[_stageIndex], () {
+      if (!mounted) return;
+      setState(() => _stageIndex++);
+      _scheduleStageAdvance();
+    });
+  }
+
+  @override
+  void dispose() {
+    _breatheCtrl.dispose();
+    _shimmerCtrl.dispose();
+    for (final c in _fadeCtrls) {
+      c.dispose();
+    }
+    _stageTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return AnimatedBuilder(
+      animation: _breatheCtrl,
+      builder: (context, _) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(0, -0.25),
+              radius: 1.1 + _breatheCtrl.value * 0.25,
+              colors: [
+                primary.withValues(
+                  alpha:
+                      (dark ? 0.06 : 0.04) +
+                      _breatheCtrl.value * (dark ? 0.05 : 0.03),
+                ),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── breathing orb ──────────────────────────────────
+                Center(
+                  child: Transform.scale(
+                    scale: 0.90 + _breatheCtrl.value * 0.10,
+                    child: Opacity(
+                      opacity: 0.3 + _breatheCtrl.value * 0.45,
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: primary.withValues(alpha: 0.35),
+                            width: 1.5,
+                          ),
+                          color: primary.withValues(alpha: 0.07),
+                        ),
+                        child: Icon(
+                          Icons.spa_outlined,
+                          color: primary,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 52),
+
+                // ── pipeline ────────────────────────────────────────
+                _PipelineStage(
+                  index: 0,
+                  activeIndex: _stageIndex,
+                  fade: _fadeAnims[0],
+                  breathe: _breatheCtrl,
+                  shimmer: _shimmerCtrl,
+                  primary: primary,
+                  dark: dark,
+                  label: 'Sensing',
+                  description: 'GPS · Health · Calendar',
+                  icons: const [
+                    Icons.explore_outlined,
+                    Icons.favorite_outline,
+                    Icons.event_outlined,
+                  ],
+                ),
+
+                _PipelineConnector(primary: primary, dark: dark),
+
+                _PipelineStage(
+                  index: 1,
+                  activeIndex: _stageIndex,
+                  fade: _fadeAnims[1],
+                  breathe: _breatheCtrl,
+                  shimmer: _shimmerCtrl,
+                  primary: primary,
+                  dark: dark,
+                  label: 'Writing',
+                  description: 'AI composing your first entry',
+                  icons: const [Icons.auto_awesome_rounded],
+                ),
+
+                _PipelineConnector(primary: primary, dark: dark),
+
+                _PipelineStage(
+                  index: 2,
+                  activeIndex: _stageIndex,
+                  fade: _fadeAnims[2],
+                  breathe: _breatheCtrl,
+                  shimmer: _shimmerCtrl,
+                  primary: primary,
+                  dark: dark,
+                  label: 'Patterns',
+                  description: 'Building your personal baseline',
+                  icons: const [Icons.bar_chart_rounded],
+                ),
+
+                const SizedBox(height: 52),
+
+                // ── footnote ────────────────────────────────────────
+                Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 600),
+                    child: Text(
+                      _stageIndex == 0
+                          ? 'Setting up · first run only'
+                          : _stageIndex == 1
+                          ? 'Composing your story…'
+                          : 'Almost there…',
+                      key: ValueKey<int>(_stageIndex),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: 0.4,
+                        color: dark ? Colors.white24 : Colors.black26,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Pipeline stage ───────────────────────────────────────────────────────────
+
+class _PipelineStage extends StatelessWidget {
+  const _PipelineStage({
+    required this.index,
+    required this.activeIndex,
+    required this.fade,
+    required this.breathe,
+    required this.shimmer,
+    required this.primary,
+    required this.dark,
+    required this.label,
+    required this.description,
+    required this.icons,
+  });
+
+  final int index;
+  final int activeIndex;
+  final Animation<double> fade;
+  final Animation<double> breathe;
+  final Animation<double> shimmer;
+  final Color primary;
+  final bool dark;
+  final String label;
+  final String description;
+  final List<IconData> icons;
+
+  _StageState get _state {
+    if (index < activeIndex) return _StageState.done;
+    if (index == activeIndex) return _StageState.active;
+    return _StageState.pending;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = _state == _StageState.active;
+    final isDone = _state == _StageState.done;
+
+    return FadeTransition(
+      opacity: fade,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([breathe, shimmer]),
+        builder: (context, _) {
+          final labelColor = isDone
+              ? primary
+              : isActive
+              ? (dark ? Colors.white70 : Colors.black87)
+              : (dark ? Colors.white24 : Colors.black26);
+          final subColor = isDone
+              ? primary.withValues(alpha: 0.65)
+              : isActive
+              ? (dark ? Colors.white54 : Colors.black45)
+              : (dark ? Colors.white12 : Colors.black12);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── dot indicator ──
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOut,
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDone
+                          ? primary.withValues(alpha: 0.15)
+                          : isActive
+                          ? primary.withValues(
+                              alpha: 0.10 + breathe.value * 0.08,
+                            )
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: isDone
+                            ? primary
+                            : isActive
+                            ? primary.withValues(
+                                alpha: 0.55 + breathe.value * 0.45,
+                              )
+                            : (dark ? Colors.white12 : Colors.black12),
+                        width: isActive ? 2 : 1.5,
+                      ),
+                    ),
+                    child: isDone
+                        ? Icon(Icons.check, size: 12, color: primary)
+                        : isActive
+                        ? Center(
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: primary.withValues(
+                                  alpha: 0.5 + breathe.value * 0.5,
+                                ),
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+
+                // ── text + icons ──
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 300),
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: isActive
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: labelColor,
+                            ),
+                            child: Text(label),
+                          ),
+                          const SizedBox(width: 8),
+                          // Show sensor icons next to label
+                          for (final ic in icons)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 3),
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 300),
+                                opacity: isDone
+                                    ? 0.5
+                                    : isActive
+                                    ? 0.35 + shimmer.value * 0.55
+                                    : 0.15,
+                                child: Icon(
+                                  ic,
+                                  size: 13,
+                                  color: isDone
+                                      ? primary
+                                      : (dark ? Colors.white : Colors.black87),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w300,
+                          color: subColor,
+                        ),
+                        child: Text(isActive ? '$description…' : description),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Thin vertical connector between pipeline stages ─────────────────────────
+
+class _PipelineConnector extends StatelessWidget {
+  const _PipelineConnector({required this.primary, required this.dark});
+
+  final Color primary;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10, top: 3, bottom: 3),
+      child: Container(
+        width: 1.5,
+        height: 22,
+        color: dark
+            ? Colors.white.withValues(alpha: 0.10)
+            : Colors.black.withValues(alpha: 0.08),
+      ),
     );
   }
 }

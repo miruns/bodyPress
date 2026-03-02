@@ -35,7 +35,29 @@ void main() async {
 
     // Check whether the user opted out of seeing the intro.
     final db = container.read(localDbServiceProvider);
-    skipOnboarding = (await db.getSetting('skip_onboarding')) == 'true';
+    final explicitSkip = (await db.getSetting('skip_onboarding')) == 'true';
+
+    if (explicitSkip) {
+      skipOnboarding = true;
+    } else {
+      // Also skip onboarding when all critical permissions are already
+      // granted — e.g. the user revoked the "don't show again" setting
+      // but kept their OS permissions, or re-installed the app.
+      final permService = container.read(permissionServiceProvider);
+      final healthService = container.read(healthServiceProvider);
+      final criticalPerms = await permService
+          .areCriticalPermissionsGranted()
+          .timeout(const Duration(seconds: 3), onTimeout: () => false);
+      final healthPerms = await healthService.hasPermissions().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
+      skipOnboarding = criticalPerms && healthPerms;
+      if (skipOnboarding) {
+        // Persist so future cold-starts skip the permission check entirely.
+        await db.setSetting('skip_onboarding', 'true');
+      }
+    }
 
     // Schedule daily reminder — default to 9:00 AM if never configured.
     final dailyReminderTime = await db.getSetting('daily_reminder_time');

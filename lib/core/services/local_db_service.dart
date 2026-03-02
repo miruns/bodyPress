@@ -296,6 +296,16 @@ class LocalDbService {
     return loadEntry(date);
   }
 
+  /// Returns true when at least one journal entry exists in the database.
+  /// Used to detect a first-time install vs a returning user.
+  Future<bool> hasAnyEntries() async {
+    final db = await _database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM $_tableEntries LIMIT 1',
+    );
+    return (result.first['count'] as int? ?? 0) > 0;
+  }
+
   /// Delete the persisted entry for [date] (no-op if absent).
   Future<void> deleteEntry(DateTime date) async {
     final db = await _database;

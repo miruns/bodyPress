@@ -31,7 +31,8 @@ class PermissionService {
 
     results['location'] = await requestLocationPermission();
     results['calendar'] = await requestCalendarPermission();
-    results['activityRecognition'] = await requestActivityRecognitionPermission();
+    results['activityRecognition'] =
+        await requestActivityRecognitionPermission();
     results['sensors'] = await requestSensorsPermission();
 
     return results;
@@ -53,8 +54,18 @@ class PermissionService {
   Future<bool> areAllPermissionsGranted() async {
     final location = await isLocationPermissionGranted();
     final calendar = await isCalendarPermissionGranted();
-    
+
     return location && calendar;
+  }
+
+  /// Returns true when the permissions that gate the core experience are in
+  /// place — location + activity recognition.  Calendar, notifications, and
+  /// body-sensors enhance the experience but are not required to skip the
+  /// intro.  This check never triggers a system dialog.
+  Future<bool> areCriticalPermissionsGranted() async {
+    final location = await Permission.location.status;
+    final activity = await Permission.activityRecognition.status;
+    return location.isGranted && activity.isGranted;
   }
 
   // Open app settings if permissions are denied
