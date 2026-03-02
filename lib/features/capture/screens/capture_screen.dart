@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import '../../../core/models/capture_entry.dart';
 import '../../../core/services/ble_heart_rate_service.dart';
 import '../../../core/services/service_providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/live_hr_waveform.dart';
 
 /// Capture tab — camera-inspired data capture.
@@ -142,8 +143,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                   : 'Processing failed — check your AI service key',
             ),
             backgroundColor: succeeded
-                ? Colors.green.shade600
-                : Colors.red.shade600,
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -158,7 +159,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Processing error: $e'),
-            backgroundColor: Colors.red.shade600,
+            backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -189,7 +190,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                   : 'No captures could be processed — check AI service',
             ),
             backgroundColor: processed > 0
-                ? Colors.green.shade600
+                ? Theme.of(context).colorScheme.primary
                 : Colors.amber.shade700,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -204,7 +205,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Processing error: $e'),
-            backgroundColor: Colors.red.shade600,
+            backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -253,7 +254,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red.shade600,
+            backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -339,7 +340,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('BLE connection failed: $e'),
-                  backgroundColor: Colors.red.shade700,
+                  backgroundColor: Theme.of(context).colorScheme.error,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -365,14 +366,15 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   }
 
   Widget _buildBleWaveformCard(ThemeData theme) {
+    final dark = theme.brightness == Brightness.dark;
     if (_bleState == BleConnectionState.connecting) {
       return Container(
         height: 140,
         decoration: BoxDecoration(
-          color: const Color(0xFF060B0F),
+          color: dark ? AppTheme.tidePool : const Color(0xFFEEEEF2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: const Color(0xFF00E676).withValues(alpha: 0.2),
+            color: theme.colorScheme.primary.withValues(alpha: 0.15),
             width: 1.5,
           ),
         ),
@@ -380,20 +382,20 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(Color(0xFF00E676)),
+                  valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 'Connecting to ${_bleDeviceName ?? 'device'}…',
-                style: GoogleFonts.robotoMono(
-                  fontSize: 12,
-                  color: const Color(0xFF00E676).withValues(alpha: 0.6),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -425,9 +427,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: dark
-            ? const Color(0xFF0D0D0F)
-            : const Color(0xFFF6F6F8),
+        backgroundColor: dark ? AppTheme.midnight : const Color(0xFFF6F6F8),
         body: FadeTransition(
           opacity: _fadeAnim,
           child: Column(
@@ -531,7 +531,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     return Container(
       height: 130,
       decoration: BoxDecoration(
-        color: dark ? const Color(0xFF1A1A1D) : const Color(0xFFEEEEF2),
+        color: dark ? AppTheme.tidePool : const Color(0xFFEEEEF2),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: theme.colorScheme.primary.withValues(alpha: 0.15),
@@ -708,7 +708,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                 : 'BLE HR',
             _includeBleHr,
             _onBleChipTap,
-            const Color(0xFF00E676),
+            theme.colorScheme.primary,
           ),
           const SizedBox(width: 8),
           _sensorChip(
@@ -969,14 +969,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                     height: 10,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.5,
-                      color: Colors.amber.shade600,
+                      color: theme.colorScheme.primary.withValues(alpha: 0.6),
                     ),
                   )
                 else
                   Icon(
                     Icons.play_arrow_rounded,
                     size: 14,
-                    color: Colors.amber.shade600,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.7),
                   ),
                 const SizedBox(width: 4),
                 Text(
@@ -985,7 +985,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.0,
-                    color: Colors.amber.shade600,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -1013,11 +1013,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: dark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
+              color: dark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: (dark ? Colors.white : Colors.black).withValues(
-                  alpha: 0.06,
+                  alpha: dark ? 0.06 : 0.04,
                 ),
               ),
             ),
@@ -1031,7 +1033,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: capture.isProcessed
-                        ? Colors.green.shade400
+                        ? theme.colorScheme.primary
                         : Colors.amber.shade600,
                   ),
                 ),
@@ -1134,8 +1136,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
             ),
             border: Border(
               top: BorderSide(
-                color: (dark ? Colors.white : Colors.black).withValues(
-                  alpha: 0.07,
+                color: (dark ? AppTheme.shimmer : Colors.black).withValues(
+                  alpha: dark ? 0.6 : 0.07,
                 ),
               ),
             ),
@@ -1285,9 +1287,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                     color: Colors.amber.shade600,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: dark
-                          ? const Color(0xFF0D0D0F)
-                          : const Color(0xFFF6F6F8),
+                      color: dark ? AppTheme.midnight : const Color(0xFFF6F6F8),
                       width: 2,
                     ),
                   ),
@@ -1345,7 +1345,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
           expand: false,
           builder: (_, scrollCtrl) => Container(
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF1C1C1E) : Colors.white,
+              color: dark ? AppTheme.current : Colors.white,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
@@ -1456,14 +1456,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                               : Icon(
                                   Icons.play_arrow_rounded,
                                   size: 16,
-                                  color: Colors.amber.shade600,
+                                  color: theme.colorScheme.primary,
                                 ),
                           label: Text(
                             'Process all',
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Colors.amber.shade600,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                           style: TextButton.styleFrom(
@@ -1517,7 +1517,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
 
           return Container(
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF1C1C1E) : Colors.white,
+              color: dark ? AppTheme.current : Colors.white,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
@@ -1581,7 +1581,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                             ? Icons.check_circle_rounded
                             : Icons.hourglass_empty_rounded,
                         valueColor: capture.isProcessed
-                            ? Colors.green.shade400
+                            ? theme.colorScheme.primary
                             : Colors.amber.shade600,
                       ),
                       if (!capture.isProcessed)
@@ -1602,26 +1602,26 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.amber.shade600,
+                                        color: theme.colorScheme.primary,
                                       ),
                                     )
                                   : Icon(
                                       Icons.psychology_rounded,
                                       size: 18,
-                                      color: Colors.amber.shade600,
+                                      color: theme.colorScheme.primary,
                                     ),
                               label: Text(
                                 _isProcessing ? 'Processing…' : 'Process Now',
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.amber.shade600,
+                                  color: theme.colorScheme.primary,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
-                                  color: Colors.amber.shade600.withValues(
-                                    alpha: 0.4,
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.3,
                                   ),
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -2062,11 +2062,11 @@ class _BleDevicePickerSheetState extends State<_BleDevicePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    const accent = Color(0xFF00E676);
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Container(
       decoration: BoxDecoration(
-        color: dark ? const Color(0xFF141418) : Colors.white,
+        color: dark ? AppTheme.current : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
@@ -2092,9 +2092,9 @@ class _BleDevicePickerSheetState extends State<_BleDevicePickerSheet> {
             padding: const EdgeInsets.fromLTRB(24, 16, 16, 12),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.bluetooth_searching_rounded,
-                  color: accent,
+                  color: primary,
                   size: 22,
                 ),
                 const SizedBox(width: 10),
@@ -2109,12 +2109,12 @@ class _BleDevicePickerSheetState extends State<_BleDevicePickerSheet> {
                   ),
                 ),
                 if (_scanning)
-                  const SizedBox(
+                  SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(accent),
+                      valueColor: AlwaysStoppedAnimation(primary),
                     ),
                   ),
                 const SizedBox(width: 8),
@@ -2172,7 +2172,7 @@ class _BleDevicePickerSheetState extends State<_BleDevicePickerSheet> {
                     onPressed: _startScan,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Retry scan'),
-                    style: TextButton.styleFrom(foregroundColor: accent),
+                    style: TextButton.styleFrom(foregroundColor: primary),
                   ),
                 ],
               ),
@@ -2191,12 +2191,12 @@ class _BleDevicePickerSheetState extends State<_BleDevicePickerSheet> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
+                        color: primary.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.monitor_heart_rounded,
-                        color: accent,
+                        color: primary,
                         size: 22,
                       ),
                     ),
@@ -2216,10 +2216,7 @@ class _BleDevicePickerSheetState extends State<_BleDevicePickerSheet> {
                         ),
                       ),
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: accent,
-                    ),
+                    trailing: Icon(Icons.chevron_right_rounded, color: primary),
                     onTap: () => widget.onDeviceSelected(d.device, d.name),
                   );
                 },
