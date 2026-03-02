@@ -18,6 +18,8 @@ A cross-platform Flutter app that collects physiological, environmental, and beh
     <td><img width="200" src="https://github.com/user-attachments/assets/400c148d-80cc-4614-b224-e1b11ff16a29" /></td>
     <td><img width="200" src="https://github.com/user-attachments/assets/89eb3103-79c0-4b05-8a16-2f077ef2c46b" /></td>
     <td><img width="200" src="https://github.com/user-attachments/assets/6afd6d98-23a1-4cd2-9c2d-cd3e9c2d3841" /></td>
+     <td><img width="200" alt="image" src="https://github.com/user-attachments/assets/39a1ab62-2769-49e0-a195-0bc4d4386df8" /></td>
+
     <td><img width="200" alt="Journal" src="https://github.com/user-attachments/assets/83c0a31e-1cfe-48e3-9478-9fcbf6c12dcc" /></td>
     <td><img width="200" alt="Capture" src="https://github.com/user-attachments/assets/4a6de629-54b0-40f4-af2a-b8650b305fd2" /></td>
     <td><img width="200" alt="Patterns" src="https://github.com/user-attachments/assets/7b58bd67-4dc1-4cd4-88a7-6a177d931bb1" /></td>
