@@ -33,6 +33,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   int _page = 0;
   bool _busy = false;
+  bool _healthPhase2 = false;
 
   /// Selected daily notification time — defaults to 9:00 AM.
   TimeOfDay _notifTime = const TimeOfDay(hour: 9, minute: 0);
@@ -110,14 +111,46 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
       );
     } catch (_) {}
 
-    // Check whether the OS actually granted access.
-    await _healthService.hasPermissions().timeout(
+    // Check whether health permissions are actually granted now.
+    final granted = await _healthService.hasPermissions().timeout(
       const Duration(seconds: 5),
       onTimeout: () => false,
     );
 
-    if (mounted) setState(() => _busy = false);
-    _next();
+    if (!mounted) return;
+    if (granted) {
+      setState(() => _busy = false);
+      _next();
+    } else {
+      // Android: Health Connect permissions require the user to open the app
+      // and explicitly allow access there. Show the follow-up phase instead of
+      // silently advancing.
+      setState(() {
+        _busy = false;
+        _healthPhase2 = true;
+      });
+    }
+  }
+
+  /// Opens Health Connect so the user can finish granting data access.
+  /// Re-checks permissions when they return; advances if granted.
+  Future<void> _openHealthConnect() async {
+    setState(() => _busy = true);
+    try {
+      await _healthService.openHealthConnectApp();
+      final granted = await _healthService.hasPermissions().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _healthPhase2 = !granted;
+      });
+      if (granted) _next();
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _requestCalendar() async {
@@ -226,6 +259,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                       onSkip: _next,
                       busy: _busy,
                       breathe: _breathe,
+                      showPhase2: _healthPhase2,
+                      onOpenHealthConnect: _openHealthConnect,
                     ),
                     _PermissionStep(
                       icon: Icons.event_outlined,
@@ -595,6 +630,8 @@ class _HealthPermissionStep extends StatelessWidget {
     required this.onSkip,
     required this.busy,
     required this.breathe,
+    this.showPhase2 = false,
+    this.onOpenHealthConnect,
   });
 
   final Color accent;
@@ -603,6 +640,13 @@ class _HealthPermissionStep extends StatelessWidget {
   final bool busy;
   final AnimationController breathe;
 
+  /// Android only — true after the OS dialog was shown but Health Connect
+  /// permissions were not yet granted.
+  final bool showPhase2;
+
+  /// Opens the Health Connect app so the user can finish granting access.
+  final VoidCallback? onOpenHealthConnect;
+
   bool get _isIOS => Platform.isIOS;
 
   String get _platformName => _isIOS ? 'Apple Health' : 'Health Connect';
@@ -610,6 +654,19 @@ class _HealthPermissionStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+
+    // ── Android phase 2 ──────────────────────────────────────────────────────
+    // The OS "Physical activity" dialog was shown, but Health Connect still
+    // needs to be opened to grant the actual data-type permissions.
+    if (showPhase2 && !_isIOS) {
+      return _AndroidHealthConnectPhase2(
+        accent: accent,
+        breathe: breathe,
+        busy: busy,
+        onOpenHealthConnect: onOpenHealthConnect ?? onSkip,
+        onContinueAnyhow: onSkip,
+      );
+    }
 
     return Column(
       children: [
@@ -667,6 +724,12 @@ class _HealthPermissionStep extends StatelessWidget {
                   ),
                 ),
 
+                // Android: show a concise 2-step heads-up before they tap
+                if (!_isIOS) ...[
+                  const SizedBox(height: 24),
+                  _AndroidTwoStepNote(accent: accent),
+                ],
+
                 const SizedBox(height: 24),
 
                 _PrivacyNote(
@@ -709,6 +772,355 @@ class _HealthPermissionStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Android helpers — shown in _HealthPermissionStep
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Inline note that explains the Android 2-step process BEFORE the user taps
+/// "Allow Health Connect".
+class _AndroidTwoStepNote extends StatelessWidget {
+  const _AndroidTwoStepNote({required this.accent});
+
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: dark ? 0.08 : 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: dark ? 0.18 : 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 13, color: accent),
+              const SizedBox(width: 6),
+              Text(
+                'HOW IT WORKS ON ANDROID',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.4,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _AndroidStep(
+            number: '1',
+            accent: accent,
+            label: 'Allow "Physical activity" in the system dialog',
+          ),
+          const SizedBox(height: 8),
+          _AndroidStep(
+            number: '2',
+            accent: accent,
+            label: 'Open Health Connect → tap BodyPress → allow data access',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AndroidStep extends StatelessWidget {
+  const _AndroidStep({
+    required this.number,
+    required this.accent,
+    required this.label,
+  });
+
+  final String number;
+  final Color accent;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accent.withValues(alpha: 0.15),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              height: 1.5,
+              fontWeight: FontWeight.w400,
+              color: dark ? Colors.white60 : Colors.black54,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown on Android after the OS dialog if Health Connect permissions
+/// were not fully granted yet. Guides the user through the second step.
+class _AndroidHealthConnectPhase2 extends StatelessWidget {
+  const _AndroidHealthConnectPhase2({
+    required this.accent,
+    required this.breathe,
+    required this.busy,
+    required this.onOpenHealthConnect,
+    required this.onContinueAnyhow,
+  });
+
+  final Color accent;
+  final AnimationController breathe;
+  final bool busy;
+  final VoidCallback onOpenHealthConnect;
+  final VoidCallback onContinueAnyhow;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              children: [
+                const SizedBox(height: 36),
+
+                _HealthOrb(size: 140, accent: accent, breathe: breathe),
+
+                const SizedBox(height: 36),
+
+                Text(
+                  'One more\nstep',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                    color: dark ? Colors.white : Colors.black87,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  'HEALTH CONNECT',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2.0,
+                    color: accent.withValues(alpha: 0.8),
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // Step 1 — already done
+                _Phase2Row(
+                  number: '1',
+                  accent: accent,
+                  done: true,
+                  label: '"Physical activity" system permission',
+                  sublabel: 'Granted',
+                ),
+
+                const SizedBox(height: 12),
+
+                // Step 2 — pending
+                _Phase2Row(
+                  number: '2',
+                  accent: accent,
+                  done: false,
+                  label: 'Health Connect data access',
+                  sublabel: 'Tap BodyPress → allow steps, heart rate, sleep…',
+                ),
+
+                const SizedBox(height: 28),
+
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: dark ? 0.07 : 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: accent.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.touch_app_outlined,
+                        size: 16,
+                        color: accent.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Tap the button below → Health Connect will open → '
+                          'find BodyPress in the app list → allow access.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            height: 1.55,
+                            fontWeight: FontWeight.w300,
+                            color: dark ? Colors.white54 : Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+
+        // Pinned CTAs
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            children: [
+              _PillButton(
+                label: 'Open Health Connect',
+                color: accent,
+                onPressed: busy ? null : onOpenHealthConnect,
+                busy: busy,
+              ),
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: busy ? null : onContinueAnyhow,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Skip for now',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Phase2Row extends StatelessWidget {
+  const _Phase2Row({
+    required this.number,
+    required this.accent,
+    required this.done,
+    required this.label,
+    required this.sublabel,
+  });
+
+  final String number;
+  final Color accent;
+  final bool done;
+  final String label;
+  final String sublabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final dimColor = dark ? Colors.white38 : Colors.black26;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done
+                ? const Color(0xFF6BAE6B).withValues(alpha: 0.15)
+                : accent.withValues(alpha: 0.12),
+          ),
+          child: Center(
+            child: done
+                ? const Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: Color(0xFF6BAE6B),
+                  )
+                : Text(
+                    number,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: done
+                      ? dimColor
+                      : (dark ? Colors.white : Colors.black87),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sublabel,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  height: 1.4,
+                  fontWeight: FontWeight.w300,
+                  color: done
+                      ? const Color(0xFF6BAE6B).withValues(alpha: 0.8)
+                      : (dark ? Colors.white54 : Colors.black45),
+                ),
+              ),
             ],
           ),
         ),

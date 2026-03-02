@@ -451,14 +451,6 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
     await _loadBgCapture();
   }
 
-  Future<void> _toggleBgNotifications() async {
-    final newConfig = _bgConfig.copyWith(
-      notificationsEnabled: !_bgConfig.notificationsEnabled,
-    );
-    await _bgCapture.updateConfig(newConfig);
-    await _loadBgCapture();
-  }
-
   Future<void> _requestNotificationPermission() async {
     final notifService = ref.read(notificationServiceProvider);
     await notifService.initialize();
@@ -1747,14 +1739,6 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
           () => _toggleBgDataSource('calendar'),
           dark,
         ),
-        _bgToggleRow(
-          'Notifications',
-          Icons.notifications_outlined,
-          _bgConfig.notificationsEnabled,
-          _toggleBgNotifications,
-          dark,
-        ),
-
         Divider(height: 1, color: dark ? Colors.white12 : Colors.black12),
 
         // ── Interval selector

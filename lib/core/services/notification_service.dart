@@ -25,11 +25,6 @@ class NotificationService {
 
   // ── Channel IDs ─────────────────────────────────────────────────────────
 
-  static const _captureChannelId = 'bodypress_background_capture';
-  static const _captureChannelName = 'Background Captures';
-  static const _captureChannelDescription =
-      'Notifications for automatic background data captures';
-
   static const _dailyChannelId = 'bodypress_daily_reminder';
   static const _dailyChannelName = 'Daily Body Blog';
   static const _dailyChannelDescription =
@@ -152,14 +147,6 @@ class NotificationService {
     if (androidImpl != null) {
       await androidImpl.createNotificationChannel(
         const AndroidNotificationChannel(
-          _captureChannelId,
-          _captureChannelName,
-          description: _captureChannelDescription,
-          importance: Importance.low,
-        ),
-      );
-      await androidImpl.createNotificationChannel(
-        const AndroidNotificationChannel(
           _dailyChannelId,
           _dailyChannelName,
           description: _dailyChannelDescription,
@@ -172,60 +159,6 @@ class NotificationService {
   }
 
   // ── Public helpers ────────────────────────────────────────────────────
-
-  /// Show a "capture complete" notification.
-  Future<void> showCaptureComplete({
-    required String captureId,
-    String? dataSources,
-  }) async {
-    await _ensureInitialised();
-
-    final body = dataSources != null
-        ? 'Captured $dataSources automatically.'
-        : 'Automatic data capture complete.';
-
-    await _plugin.show(
-      captureId.hashCode, // unique int per capture
-      'Background Capture',
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _captureChannelId,
-          _captureChannelName,
-          channelDescription: _captureChannelDescription,
-          importance: Importance.low,
-          priority: Priority.low,
-          showWhen: true,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: false,
-          presentSound: false,
-        ),
-      ),
-    );
-  }
-
-  /// Show a notification for a capture error (only for critical failures).
-  Future<void> showCaptureError({required String message}) async {
-    await _ensureInitialised();
-
-    await _plugin.show(
-      'capture_error'.hashCode,
-      'Capture Failed',
-      message,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _captureChannelId,
-          _captureChannelName,
-          channelDescription: _captureChannelDescription,
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
-        ),
-        iOS: DarwinNotificationDetails(presentAlert: true),
-      ),
-    );
-  }
 
   /// Request notification permission on Android 13+ / iOS.
   Future<bool> requestPermission() async {

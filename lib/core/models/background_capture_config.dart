@@ -37,9 +37,6 @@ class BackgroundCaptureConfig {
   /// Reduce capture frequency when battery is low.
   final bool batteryOptimization;
 
-  /// Show local notifications for background capture results.
-  final bool notificationsEnabled;
-
   const BackgroundCaptureConfig({
     this.enabled = true,
     this.interval = const Duration(minutes: 30),
@@ -52,7 +49,6 @@ class BackgroundCaptureConfig {
     this.quietHoursEndHour = 7,
     this.quietHoursEndMinute = 0,
     this.batteryOptimization = true,
-    this.notificationsEnabled = true,
   });
 
   /// Default configuration — background captures enabled.
@@ -71,7 +67,6 @@ class BackgroundCaptureConfig {
     int? quietHoursEndHour,
     int? quietHoursEndMinute,
     bool? batteryOptimization,
-    bool? notificationsEnabled,
   }) {
     return BackgroundCaptureConfig(
       enabled: enabled ?? this.enabled,
@@ -86,7 +81,6 @@ class BackgroundCaptureConfig {
       quietHoursEndHour: quietHoursEndHour ?? this.quietHoursEndHour,
       quietHoursEndMinute: quietHoursEndMinute ?? this.quietHoursEndMinute,
       batteryOptimization: batteryOptimization ?? this.batteryOptimization,
-      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
 
@@ -120,7 +114,6 @@ class BackgroundCaptureConfig {
     'quiet_hours_end_hour': quietHoursEndHour,
     'quiet_hours_end_minute': quietHoursEndMinute,
     'battery_optimization': batteryOptimization,
-    'notifications_enabled': notificationsEnabled,
   };
 
   factory BackgroundCaptureConfig.fromJson(Map<String, dynamic> json) {
@@ -136,7 +129,6 @@ class BackgroundCaptureConfig {
       quietHoursEndHour: json['quiet_hours_end_hour'] as int? ?? 7,
       quietHoursEndMinute: json['quiet_hours_end_minute'] as int? ?? 0,
       batteryOptimization: json['battery_optimization'] as bool? ?? true,
-      notificationsEnabled: json['notifications_enabled'] as bool? ?? true,
     );
   }
 

@@ -136,8 +136,9 @@ class _HealthCard extends StatelessWidget {
                         _isIOS
                             ? 'Allow Apple Health access so BodyPress can track '
                                   'your steps, heart rate, sleep, and workouts.'
-                            : 'Grant Health Connect access so BodyPress can track '
-                                  'your steps, heart rate, sleep, and workouts.',
+                            : '1 · Tap "Open Health Connect" below\n'
+                                  '2 · Find BodyPress in the app list\n'
+                                  '3 · Allow access to steps, heart rate & sleep',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           height: 1.5,

@@ -18,7 +18,6 @@ void main() {
       expect(c.quietHoursEndHour, 7);
       expect(c.quietHoursEndMinute, 0);
       expect(c.batteryOptimization, true);
-      expect(c.notificationsEnabled, true);
     });
   });
 
@@ -38,7 +37,6 @@ void main() {
         quietHoursEndHour: 6,
         quietHoursEndMinute: 45,
         batteryOptimization: false,
-        notificationsEnabled: false,
       );
       final json = original.toJson();
       final decoded = BackgroundCaptureConfig.fromJson(json);
@@ -54,7 +52,6 @@ void main() {
       expect(decoded.quietHoursEndHour, original.quietHoursEndHour);
       expect(decoded.quietHoursEndMinute, original.quietHoursEndMinute);
       expect(decoded.batteryOptimization, original.batteryOptimization);
-      expect(decoded.notificationsEnabled, original.notificationsEnabled);
     });
 
     test('fromJson uses defaults for missing keys', () {

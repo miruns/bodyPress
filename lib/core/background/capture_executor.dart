@@ -6,7 +6,6 @@ import '../models/background_capture_config.dart';
 import '../models/capture_entry.dart';
 import '../services/capture_service.dart';
 import '../services/local_db_service.dart';
-import '../services/notification_service.dart';
 
 /// Top-level callback invoked by WorkManager in a background isolate.
 ///
@@ -77,21 +76,6 @@ Future<bool> captureExecutorCallback() async {
 
       // Increment success counter
       await _incrementCounter(dbService, 'bg_capture_success_count');
-
-      // 6. Show notification (if enabled)
-      if (config.notificationsEnabled) {
-        try {
-          final notifService = NotificationService();
-          await notifService.initialize();
-          await notifService.showCaptureComplete(
-            captureId: capture.id,
-            dataSources: _describeSources(config),
-          );
-        } catch (e) {
-          // Non-fatal — don't fail the whole task for a notification issue.
-          debugPrint('[CaptureExecutor] Notification error: $e');
-        }
-      }
 
       debugPrint(
         '[CaptureExecutor] Capture ${capture.id} saved '
