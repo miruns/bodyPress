@@ -1064,6 +1064,14 @@ class _BlogDetailPageState extends ConsumerState<_BlogDetailPage> {
     _entry = widget.entry;
   }
 
+  /// True when this entry belongs to the current calendar day.
+  /// Past entries are locked — only notes / mood can be edited.
+  bool get _isEntryToday {
+    final now = DateTime.now();
+    final d = _entry.date;
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
   Future<void> _regenerateWithAi() async {
     if (_aiRegenerating) return;
     setState(() => _aiRegenerating = true);
@@ -1355,31 +1363,32 @@ class _BlogDetailPageState extends ConsumerState<_BlogDetailPage> {
                                 : (dark ? Colors.white38 : Colors.black38),
                           ),
                   ),
-                  // AI regenerate button
-                  _aiRegenerating
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : Tooltip(
-                          message: _entry.aiGenerated
-                              ? 'Rewrite entry'
-                              : 'Generate entry',
-                          child: IconButton(
-                            onPressed: _regenerateWithAi,
-                            icon: Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 20,
-                              color: _entry.aiGenerated
-                                  ? primary
-                                  : (dark ? Colors.white38 : Colors.black38),
+                  // AI regenerate button — today only; past entries are locked.
+                  if (_isEntryToday)
+                    _aiRegenerating
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : Tooltip(
+                            message: _entry.aiGenerated
+                                ? 'Rewrite entry'
+                                : 'Generate entry',
+                            child: IconButton(
+                              onPressed: _regenerateWithAi,
+                              icon: Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 20,
+                                color: _entry.aiGenerated
+                                    ? primary
+                                    : (dark ? Colors.white38 : Colors.black38),
+                              ),
                             ),
                           ),
-                        ),
                 ],
               ),
             ),

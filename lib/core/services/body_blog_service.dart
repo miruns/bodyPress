@@ -79,8 +79,18 @@ class BodyBlogService {
     // Persist a capture so the Capture & Patterns pages stay in sync.
     await _createCaptureFromSnapshot(now, snapshot);
     var entry = _compose(now, snapshot);
-    entry = await _applyAi(now, entry, snapshot);
+
+    // ── SAVE LOCAL DRAFT IMMEDIATELY ──
+    // Guarantees today's entry survives even if the AI call times out,
+    // the app is killed, or the device loses connectivity. The AI enrichment
+    // below will overwrite this draft with richer content when it succeeds.
     await _db.saveEntry(entry);
+
+    final enriched = await _applyAi(now, entry, snapshot);
+    if (!identical(enriched, entry)) {
+      await _db.saveEntry(enriched);
+      entry = enriched;
+    }
 
     // Mark any captures that existed for today as processed.
     final todayCaptures = await _db.loadCapturesForDate(now);
@@ -113,8 +123,15 @@ class BodyBlogService {
       }
     }
 
-    entry = await _applyAi(now, entry, snapshot);
+    // ── SAVE LOCAL DRAFT IMMEDIATELY ──
+    // Protects against data loss if the AI call does not complete.
     await _db.saveEntry(entry);
+
+    final enriched = await _applyAi(now, entry, snapshot);
+    if (!identical(enriched, entry)) {
+      entry = enriched;
+      await _db.saveEntry(entry);
+    }
 
     // Mark every capture for today as processed.
     final todayCaptures = await _db.loadCapturesForDate(now);
@@ -125,46 +142,50 @@ class BodyBlogService {
     return entry;
   }
 
-  /// Force-regenerate a journal entry with AI for any [date].
+  /// Force-regenerate a journal entry with AI for [date].
   ///
-  /// Loads captures for that date from the DB and sends them to the AI.
-  /// The updated entry is persisted and returned.
-  /// Returns `null` if the entry doesn't exist in the DB and has no captures.
+  /// **Only allowed for today.** Past entries are locked — their AI-generated
+  /// headline / summary / body are immutable once the day has elapsed.
+  /// Only the user's own note / mood (via [saveUserNote]) may change a past
+  /// entry. Calling this for a past date returns the existing entry unchanged.
+  ///
+  /// Returns `null` when there is no stored entry for the given date.
   Future<BodyBlogEntry?> regenerateWithAi(DateTime date) async {
-    // For today we also refresh live sensor data; for past days use stored entry.
     final today = DateTime.now();
     final isToday =
         date.year == today.year &&
         date.month == today.month &&
         date.day == today.day;
 
-    BodyBlogEntry? base;
-    BodySnapshot? snapshot;
-
-    if (isToday) {
-      snapshot = await _collectSnapshot();
-      // Persist a capture so the Capture & Patterns pages stay in sync.
-      await _createCaptureFromSnapshot(today, snapshot);
-      base = _compose(today, snapshot);
-      final existing = await _db.loadEntry(today);
-      if (existing != null) {
-        if (existing.userNote != null) {
-          base = base.copyWith(userNote: existing.userNote);
-        }
-        if (existing.userMood != null) {
-          base = base.copyWith(userMood: existing.userMood);
-        }
-      }
-    } else {
-      base = await _db.loadEntry(date);
-      if (base == null) return null;
+    // Past entries are locked — return as-is, no AI call, no DB write.
+    if (!isToday) {
+      return _db.loadEntry(date);
     }
 
-    final updated = await _applyAi(date, base, snapshot);
-    await _db.saveEntry(updated);
+    // Today: refresh sensors + AI.
+    final snapshot = await _collectSnapshot();
+    await _createCaptureFromSnapshot(today, snapshot);
+    BodyBlogEntry base = _compose(today, snapshot);
+    final existing = await _db.loadEntry(today);
+    if (existing != null) {
+      if (existing.userNote != null) {
+        base = base.copyWith(userNote: existing.userNote);
+      }
+      if (existing.userMood != null) {
+        base = base.copyWith(userMood: existing.userMood);
+      }
+    }
 
-    // Mark all captures for this date as processed.
-    final captures = await _db.loadCapturesForDate(date);
+    // Save local draft first so the entry survives if AI times out.
+    await _db.saveEntry(base);
+
+    final updated = await _applyAi(today, base, snapshot);
+    if (!identical(updated, base)) {
+      await _db.saveEntry(updated);
+    }
+
+    // Mark all captures for today as processed.
+    final captures = await _db.loadCapturesForDate(today);
     if (captures.isNotEmpty) {
       await _db.markCapturesProcessed(captures.map((c) => c.id).toList());
     }
@@ -172,21 +193,30 @@ class BodyBlogService {
     return updated;
   }
 
-  /// Build entries for the last [days] days.
-  /// Today is always re-fetched from sensors; past days are loaded from the
-  /// local DB and fall back to a skeleton entry when not yet persisted.
+  /// Build the entry list shown in the journal slider.
+  ///
+  /// Today is always live-fetched (and persisted).
+  /// Past days are loaded from the DB — days with no stored entry are
+  /// **skipped entirely** rather than injected as misleading skeletons.
+  /// This prevents gaps in the slider where a real day used to live.
+  ///
+  /// [days] is the look-back window; the returned list may be shorter when
+  /// some days in that window have no data yet.
   Future<List<BodyBlogEntry>> getRecentEntries({int days = 7}) async {
     final today = DateTime.now();
     final entries = <BodyBlogEntry>[];
 
-    // Today – live data (also persists)
+    // Today – live data (also persists immediately, before any AI call)
     entries.add(await getTodayEntry());
 
-    // Previous days – load from DB or fall back to empty skeleton
+    // Previous days – only include days that are actually stored in the DB.
+    // A null result means the day was never logged (or data was lost before
+    // the save-before-AI fix landed); we leave those days out of the slider
+    // so the user never sees a confusing empty placeholder for a real day.
     for (var i = 1; i < days; i++) {
       final date = today.subtract(Duration(days: i));
       final stored = await _db.loadEntry(date);
-      entries.add(stored ?? _composeEmpty(date));
+      if (stored != null) entries.add(stored);
     }
 
     return entries;
