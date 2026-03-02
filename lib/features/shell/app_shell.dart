@@ -24,7 +24,17 @@ class AppShell extends StatelessWidget {
           index,
           initialLocation: index == navigationShell.currentIndex,
         ),
+        onMoreTap: () => _showMoreSheet(context),
       ),
+    );
+  }
+
+  void _showMoreSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: false,
+      builder: (_) => _MoreSheet(routerContext: context),
     );
   }
 }
@@ -37,6 +47,7 @@ class _NavItem {
     required this.activeIcon,
     required this.label,
     required this.numeral,
+    this.isMoreTab = false,
   });
   final IconData icon;
   final IconData activeIcon;
@@ -44,6 +55,9 @@ class _NavItem {
 
   /// Roman numeral shown as a subtle chapter marker on active tab.
   final String numeral;
+
+  /// When true the tab opens the overflow sheet instead of navigating.
+  final bool isMoreTab;
 }
 
 const List<_NavItem> _navItems = [
@@ -65,15 +79,60 @@ const List<_NavItem> _navItems = [
     label: 'Capture',
     numeral: 'III',
   ),
+  _NavItem(
+    icon: Icons.grid_view_outlined,
+    activeIcon: Icons.grid_view_rounded,
+    label: 'More',
+    numeral: '···',
+    isMoreTab: true,
+  ),
+];
+
+// ─── More-sheet destination model ─────────────────────────────────────────────
+
+class _MoreDestination {
+  const _MoreDestination({
+    required this.icon,
+    required this.label,
+    required this.route,
+    this.description,
+  });
+  final IconData icon;
+  final String label;
+  final String route;
+  final String? description;
+}
+
+/// Destinations surfaced in the More overflow sheet.
+/// Add new features here first; graduate them to [_navItems] when they earn
+/// a permanent spot in the primary navigation.
+const List<_MoreDestination> _moreDestinations = [
+  _MoreDestination(
+    icon: Icons.tune_rounded,
+    label: 'Settings',
+    route: '/environment',
+    description: 'Environment & preferences',
+  ),
+  _MoreDestination(
+    icon: Icons.bug_report_outlined,
+    label: 'Debug',
+    route: '/debug',
+    description: 'Developer panel',
+  ),
 ];
 
 // ─── Chapter navigation bar ────────────────────────────────────────────────────
 
 class _ChapterNav extends StatefulWidget {
-  const _ChapterNav({required this.currentIndex, required this.onTap});
+  const _ChapterNav({
+    required this.currentIndex,
+    required this.onTap,
+    required this.onMoreTap,
+  });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback onMoreTap;
 
   @override
   State<_ChapterNav> createState() => _ChapterNavState();
@@ -156,6 +215,7 @@ class _ChapterNavState extends State<_ChapterNav>
                   prevIndex: _prevIndex,
                   slideAnim: _slideAnim,
                   onTap: widget.onTap,
+                  onMoreTap: widget.onMoreTap,
                 ),
               ),
             ),
@@ -175,6 +235,7 @@ class _ChapterNavContent extends StatelessWidget {
     required this.prevIndex,
     required this.slideAnim,
     required this.onTap,
+    required this.onMoreTap,
   });
 
   final List<_NavItem> items;
@@ -182,12 +243,16 @@ class _ChapterNavContent extends StatelessWidget {
   final int prevIndex;
   final Animation<double> slideAnim;
   final ValueChanged<int> onTap;
+  final VoidCallback onMoreTap;
 
   @override
   Widget build(BuildContext context) {
+    // Only non-More tabs participate in the active sliding indicator.
+    final realCount = items.where((item) => !item.isMoreTab).length;
+    final total = items.length;
+
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final total = items.length;
         final itemW = constraints.maxWidth / total;
 
         // Interpolated x-position of the sliding top rule.
@@ -205,28 +270,29 @@ class _ChapterNavContent extends StatelessWidget {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // ── Glowing top-rule chapter indicator ────────────────────────
-            Positioned(
-              left: lineX + lineInset,
-              top: 0,
-              width: itemW - lineInset * 2,
-              height: lineH,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppTheme.glow,
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(2),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.glow.withValues(alpha: 0.55),
-                      blurRadius: 10,
-                      spreadRadius: 2,
+            // ── Glowing top-rule chapter indicator (real tabs only) ──────
+            if (currentIndex < realCount)
+              Positioned(
+                left: lineX + lineInset,
+                top: 0,
+                width: itemW - lineInset * 2,
+                height: lineH,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppTheme.glow,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(2),
                     ),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.glow.withValues(alpha: 0.55),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
             // ── Subtle dividers between tabs ──────────────────────────────
             ...List.generate(total - 1, (i) {
@@ -244,15 +310,20 @@ class _ChapterNavContent extends StatelessWidget {
             // ── Chapter tabs ──────────────────────────────────────────────
             Row(
               children: List.generate(total, (i) {
-                final isActive = i == currentIndex;
+                final item = items[i];
+                final isActive = !item.isMoreTab && i == currentIndex;
                 return Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      onTap(i);
+                      if (item.isMoreTab) {
+                        onMoreTap();
+                      } else {
+                        onTap(i);
+                      }
                     },
-                    child: _ChapterTab(item: items[i], isActive: isActive),
+                    child: _ChapterTab(item: item, isActive: isActive),
                   ),
                 );
               }),
@@ -323,6 +394,148 @@ class _ChapterTab extends StatelessWidget {
           child: Text(item.label.toUpperCase()),
         ),
       ],
+    );
+  }
+}
+
+// ─── More overflow sheet ──────────────────────────────────────────────────────
+
+class _MoreSheet extends StatelessWidget {
+  const _MoreSheet({required this.routerContext});
+
+  /// Context from the shell build — used for go_router navigation.
+  final BuildContext routerContext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.deepSea,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.shimmer.withValues(alpha: 0.30),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Drag handle ──────────────────────────────────────────────
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.shimmer.withValues(alpha: 0.50),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Section label ─────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Row(
+                children: [
+                  Text(
+                    'MORE',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.fog,
+                      letterSpacing: 2.5,
+                      fontFamily: 'DM Sans',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Destination tiles ─────────────────────────────────────────
+            ..._moreDestinations.map(
+              (dest) => _MoreTile(
+                destination: dest,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  routerContext.push(dest.route);
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreTile extends StatelessWidget {
+  const _MoreTile({required this.destination, required this.onTap});
+
+  final _MoreDestination destination;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppTheme.shimmer.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(destination.icon, size: 20, color: AppTheme.fog),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    destination.label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontFamily: 'DM Sans',
+                    ),
+                  ),
+                  if (destination.description != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      destination.description!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.fog,
+                        fontFamily: 'DM Sans',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppTheme.fog.withValues(alpha: 0.50),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

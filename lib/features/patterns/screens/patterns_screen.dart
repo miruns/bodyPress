@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/models/capture_entry.dart';
 import '../../../core/services/service_providers.dart';
+import '../../shared/widgets/app_header.dart';
 
 // ── Data providers ──────────────────────────────────────────────────────────
 
@@ -218,192 +219,149 @@ class _PatternBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final showBanner = isAnalyzing || justFinished;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        final container = ProviderScope.containerOf(context);
-        container.invalidate(_allCapturesProvider);
-      },
-      color: theme.colorScheme.primary,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: _Header(summary: summary, theme: theme, dark: dark),
-            ),
-          ),
-
-          if (showBanner)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: _AnalysisBanner(
-                  done: analyzingDone,
-                  total: analyzingTotal,
-                  justFinished: justFinished,
-                  theme: theme,
-                ),
-              ),
-            ),
-
-          if (summary.analyzedCaptures > 0) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: _sectionLabel('Energy Distribution', theme),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: _EnergyBar(
-                  breakdown: summary.energyBreakdown,
-                  total: summary.analyzedCaptures,
-                  theme: theme,
-                  dark: dark,
-                ),
-              ),
-            ),
-          ],
-
-          if (summary.topThemes.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: _sectionLabel('Top Themes', theme),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: _FrequencyChips(
-                  entries: summary.topThemes,
-                  color: theme.colorScheme.primary,
-                  theme: theme,
-                  dark: dark,
-                ),
-              ),
-            ),
-          ],
-
-          if (summary.topTags.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: _sectionLabel('Keywords', theme),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: _FrequencyChips(
-                  entries: summary.topTags,
-                  color: Colors.teal,
-                  theme: theme,
-                  dark: dark,
-                ),
-              ),
-            ),
-          ],
-
-          if (summary.topSignals.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: _sectionLabel('Recurring Signals', theme),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: _SignalList(
-                  signals: summary.topSignals,
-                  theme: theme,
-                  dark: dark,
-                ),
-              ),
-            ),
-          ],
-
-          if (summary.recentMoments.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                child: _sectionLabel('Recent Moments', theme),
-              ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (_, i) => Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-                  child: _MomentCard(
-                    moment: summary.recentMoments[i],
-                    theme: theme,
-                    dark: dark,
-                  ),
-                ),
-                childCount: summary.recentMoments.length,
-              ),
-            ),
-          ],
-
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Sub-widgets ──────────────────────────────────────────────────────────────
-
-class _Header extends StatelessWidget {
-  final _PatternSummary summary;
-  final ThemeData theme;
-  final bool dark;
-
-  const _Header({
-    required this.summary,
-    required this.theme,
-    required this.dark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Patterns',
-                style: GoogleFonts.inter(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${summary.analyzedCaptures} of ${summary.totalCaptures} captures analysed',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-            ],
-          ),
+        AppHeader(
+          title: 'Patterns',
+          subtitle:
+              '${summary.analyzedCaptures} of ${summary.totalCaptures} captures analysed',
         ),
-        Icon(
-          Icons.insights_rounded,
-          size: 32,
-          color: theme.colorScheme.primary.withValues(alpha: 0.6),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              final container = ProviderScope.containerOf(context);
+              container.invalidate(_allCapturesProvider);
+            },
+            color: theme.colorScheme.primary,
+            child: CustomScrollView(
+              slivers: [
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+                if (showBanner)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: _AnalysisBanner(
+                        done: analyzingDone,
+                        total: analyzingTotal,
+                        justFinished: justFinished,
+                        theme: theme,
+                      ),
+                    ),
+                  ),
+
+                if (summary.analyzedCaptures > 0) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: _sectionLabel('Energy Distribution', theme),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: _EnergyBar(
+                        breakdown: summary.energyBreakdown,
+                        total: summary.analyzedCaptures,
+                        theme: theme,
+                        dark: dark,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (summary.topThemes.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: _sectionLabel('Top Themes', theme),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: _FrequencyChips(
+                        entries: summary.topThemes,
+                        color: theme.colorScheme.primary,
+                        theme: theme,
+                        dark: dark,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (summary.topTags.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: _sectionLabel('Keywords', theme),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: _FrequencyChips(
+                        entries: summary.topTags,
+                        color: Colors.teal,
+                        theme: theme,
+                        dark: dark,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (summary.topSignals.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: _sectionLabel('Recurring Signals', theme),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: _SignalList(
+                        signals: summary.topSignals,
+                        theme: theme,
+                        dark: dark,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (summary.recentMoments.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                      child: _sectionLabel('Recent Moments', theme),
+                    ),
+                  ),
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+                        child: _MomentCard(
+                          moment: summary.recentMoments[i],
+                          theme: theme,
+                          dark: dark,
+                        ),
+                      ),
+                      childCount: summary.recentMoments.length,
+                    ),
+                  ),
+                ],
+
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 }
+
+// ── Sub-widgets ──────────────────────────────────────────────────────────────
 
 class _AnalysisBanner extends StatelessWidget {
   final int done;

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/models/capture_entry.dart';
 import '../../../core/services/service_providers.dart';
+import '../../shared/widgets/app_header.dart';
 
 /// Capture tab — camera-inspired data capture.
 /// Shutter button always visible at the bottom.
@@ -273,6 +274,39 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
           opacity: _fadeAnim,
           child: Column(
             children: [
+              // ── Pinned header ─────────────────────────────────────────
+              SafeArea(
+                bottom: false,
+                child: AppHeader(
+                  title: 'Capture',
+                  primaryAction: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_recentCaptures != null) ...[
+                        _buildMiniBadge(
+                          dark,
+                          '${_recentCaptures!.length}',
+                          Icons.layers_outlined,
+                          theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        if (_unprocessedCount > 0)
+                          _buildMiniBadge(
+                            dark,
+                            '$_unprocessedCount',
+                            Icons.hourglass_empty_rounded,
+                            Colors.amber.shade600,
+                          ),
+                      ],
+                      IconButton(
+                        onPressed: _loadRecentCaptures,
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        tooltip: 'Refresh',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               // ── Scrollable content ──────────────────────────────────
               Expanded(
                 child: RefreshIndicator(
@@ -282,14 +316,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      // Status bar spacer + top bar
-                      SliverToBoxAdapter(
-                        child: SafeArea(
-                          bottom: false,
-                          child: _buildTopBar(theme, dark),
-                        ),
-                      ),
-
                       // Viewfinder
                       SliverToBoxAdapter(
                         child: Padding(
@@ -353,51 +379,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   // ─────────────────────────────────────────────────────────────────────
   // TOP BAR
   // ─────────────────────────────────────────────────────────────────────
-
-  Widget _buildTopBar(ThemeData theme, bool dark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 12, 0),
-      child: Row(
-        children: [
-          Text(
-            'Capture',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: dark ? Colors.white : Colors.black87,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const Spacer(),
-          if (_recentCaptures != null) ...[
-            _buildMiniBadge(
-              dark,
-              '${_recentCaptures!.length}',
-              Icons.layers_outlined,
-              theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            if (_unprocessedCount > 0)
-              _buildMiniBadge(
-                dark,
-                '$_unprocessedCount',
-                Icons.hourglass_empty_rounded,
-                Colors.amber.shade600,
-              ),
-          ],
-          IconButton(
-            onPressed: _loadRecentCaptures,
-            icon: Icon(
-              Icons.refresh_rounded,
-              color: dark ? Colors.white38 : Colors.black26,
-              size: 20,
-            ),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildMiniBadge(bool dark, String value, IconData icon, Color color) {
     return Container(
