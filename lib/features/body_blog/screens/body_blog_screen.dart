@@ -2799,7 +2799,7 @@ class _VersionTile extends StatelessWidget {
     final primary = Theme.of(context).colorScheme.primary;
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (dialogContext) => Dialog(
         backgroundColor: dark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
@@ -2882,7 +2882,7 @@ class _VersionTile extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
                     child: Text(
                       'Close',
                       style: GoogleFonts.inter(fontSize: 13),
