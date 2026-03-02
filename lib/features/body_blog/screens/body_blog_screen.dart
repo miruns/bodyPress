@@ -1131,14 +1131,13 @@ class _ShareFab extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
 
-    // Frosted-glass pill: icon + label so thumb can't miss it
+    // Solid pill: icon + label so thumb can't miss it
+    final bg = dark ? const Color(0xFF2C2C2E) : const Color(0xFFE8E8ED);
     return AnimatedOpacity(
       opacity: onShare != null ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 250),
       child: Material(
-        color: dark
-            ? Colors.white.withValues(alpha: 0.10)
-            : Colors.black.withValues(alpha: 0.07),
+        color: bg,
         borderRadius: BorderRadius.circular(28),
         child: InkWell(
           onTap: sharing ? null : onShare,
@@ -1163,7 +1162,7 @@ class _ShareFab extends StatelessWidget {
                       Icon(
                         Icons.ios_share_rounded,
                         size: 17,
-                        color: dark ? Colors.white70 : Colors.black54,
+                        color: dark ? Colors.white : Colors.black87,
                       ),
                       const SizedBox(width: 7),
                       Text(
@@ -1171,7 +1170,7 @@ class _ShareFab extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: dark ? Colors.white70 : Colors.black54,
+                          color: dark ? Colors.white : Colors.black87,
                         ),
                       ),
                     ],
