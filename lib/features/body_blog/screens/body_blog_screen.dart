@@ -326,231 +326,223 @@ class _BlogPage extends StatelessWidget {
     final dateLabel = _formatDate(entry.date);
     final primary = Theme.of(context).colorScheme.primary;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        if (isToday && onRefresh != null) {
-          onRefresh!();
-        }
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
 
-            // ── date & mood ──
-            Row(
-              children: [
-                Text(
-                  dateLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 1.2,
-                    color: primary.withValues(alpha: 0.7),
-                  ),
+          // ── date & mood ──
+          Row(
+            children: [
+              Text(
+                dateLabel,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1.2,
+                  color: primary.withValues(alpha: 0.7),
                 ),
-                const Spacer(),
-                if (entry.aiGenerated) ...[
-                  const _AiBadge(),
-                  const SizedBox(width: 10),
-                ] else ...[
-                  const _RawDataBadge(),
-                  const SizedBox(width: 10),
-                ],
-                Text(entry.moodEmoji, style: const TextStyle(fontSize: 22)),
-                const SizedBox(width: 6),
-                Text(
-                  entry.mood.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.5,
-                    color: dark ? Colors.white38 : Colors.black38,
-                  ),
-                ),
+              ),
+              const Spacer(),
+              if (entry.aiGenerated) ...[
+                const _AiBadge(),
+                const SizedBox(width: 10),
+              ] else ...[
+                const _RawDataBadge(),
+                const SizedBox(width: 10),
               ],
+              Text(entry.moodEmoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 6),
+              Text(
+                entry.mood.toUpperCase(),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                  color: dark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── headline ──
+          Text(
+            entry.headline,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 30,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+              color: dark ? Colors.white : Colors.black87,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── sensor status ──
+          _SensorStatusRow(snapshot: entry.snapshot),
+
+          const SizedBox(height: 20),
+
+          // ── horizontal rule ──
+          Container(
+            width: 48,
+            height: 2,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── summary ──
+          Text(
+            entry.summary,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              height: 1.8,
+              fontWeight: FontWeight.w300,
+              color: dark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // ── tags ──
+          if (entry.tags.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: entry.tags.map((t) => _Tag(label: t)).toList(),
             ),
 
-            const SizedBox(height: 20),
+          if (entry.tags.isNotEmpty) const SizedBox(height: 28),
 
-            // ── headline ──
-            Text(
-              entry.headline,
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 30,
-                fontWeight: FontWeight.w700,
-                height: 1.25,
-                color: dark ? Colors.white : Colors.black87,
-              ),
-            ),
+          // ── snapshot glance ──
+          _SnapshotGlance(snapshot: entry.snapshot),
 
-            const SizedBox(height: 20),
+          const SizedBox(height: 28),
 
-            // ── horizontal rule ──
-            Container(
-              width: 48,
-              height: 2,
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── summary ──
-            Text(
-              entry.summary,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                height: 1.8,
-                fontWeight: FontWeight.w300,
-                color: dark ? Colors.white70 : Colors.black54,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── tags ──
-            if (entry.tags.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: entry.tags.map((t) => _Tag(label: t)).toList(),
-              ),
-
-            if (entry.tags.isNotEmpty) const SizedBox(height: 28),
-
-            // ── snapshot glance ──
-            _SnapshotGlance(snapshot: entry.snapshot),
-
-            const SizedBox(height: 20),
-
-            // ── sensor status ──
-            _SensorStatusRow(snapshot: entry.snapshot),
-
-            const SizedBox(height: 28),
-
-            // ── refresh day button (today only) ──
-            if (isToday)
-              Center(
-                child: isRefreshing
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: primary.withValues(alpha: 0.5),
-                            ),
+          // ── refresh day button (today only) ──
+          if (isToday)
+            Center(
+              child: isRefreshing
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: primary.withValues(alpha: 0.5),
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Gathering your story…',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w400,
-                              color: dark ? Colors.white38 : Colors.black38,
-                            ),
-                          ),
-                        ],
-                      )
-                    : TextButton.icon(
-                        onPressed: onRefresh,
-                        icon: Icon(
-                          Icons.auto_awesome_rounded,
-                          size: 16,
-                          color: primary.withValues(alpha: 0.7),
                         ),
-                        label: Text(
-                          'Refresh day',
+                        const SizedBox(width: 10),
+                        Text(
+                          'Gathering your story…',
                           style: GoogleFonts.inter(
                             fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: primary.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.w400,
+                            color: dark ? Colors.white38 : Colors.black38,
                           ),
                         ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(
-                              color: primary.withValues(alpha: 0.15),
-                            ),
+                      ],
+                    )
+                  : TextButton.icon(
+                      onPressed: onRefresh,
+                      icon: Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 16,
+                        color: primary.withValues(alpha: 0.7),
+                      ),
+                      label: Text(
+                        'Refresh day',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: primary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: primary.withValues(alpha: 0.15),
                           ),
                         ),
                       ),
-              ),
-
-            if (isToday) const SizedBox(height: 20),
-
-            // ── read more CTA ──
-            if (entry.fullBody.isNotEmpty)
-              Center(
-                child: TextButton(
-                  onPressed: onReadMore,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 14,
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      side: BorderSide(color: primary.withValues(alpha: 0.25)),
-                    ),
-                  ),
-                  child: Text(
-                    'Read full journal entry',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: primary,
-                    ),
-                  ),
-                ),
-              ),
+            ),
 
-            // ── version history ──
-            const SizedBox(height: 16),
+          if (isToday) const SizedBox(height: 20),
+
+          // ── read more CTA ──
+          if (entry.fullBody.isNotEmpty)
             Center(
-              child: TextButton.icon(
-                onPressed: onViewHistory,
-                icon: Icon(
-                  Icons.history_rounded,
-                  size: 15,
-                  color: dark ? Colors.white30 : Colors.black26,
-                ),
-                label: Text(
-                  'Day history',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: dark ? Colors.white38 : Colors.black38,
-                  ),
-                ),
+              child: TextButton(
+                onPressed: onReadMore,
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: 28,
+                    vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(color: primary.withValues(alpha: 0.25)),
+                  ),
+                ),
+                child: Text(
+                  'Read full journal entry',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: primary,
                   ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 32),
-          ],
-        ),
+          // ── version history ──
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton.icon(
+              onPressed: onViewHistory,
+              icon: Icon(
+                Icons.history_rounded,
+                size: 15,
+                color: dark ? Colors.white30 : Colors.black26,
+              ),
+              label: Text(
+                'Day history',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: dark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }
