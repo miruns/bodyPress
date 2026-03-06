@@ -61,25 +61,12 @@ void main() async {
       }
     }
 
-    // Schedule daily reminder — default to 9:00 AM if never configured.
-    final dailyReminderTime = await db.getSetting('daily_reminder_time');
-    final int reminderHour;
-    final int reminderMinute;
-    if (dailyReminderTime != null && dailyReminderTime.isNotEmpty) {
-      final parts = dailyReminderTime.split(':');
-      reminderHour = (parts.length == 2 ? int.tryParse(parts[0]) : null) ?? 9;
-      reminderMinute = (parts.length == 2 ? int.tryParse(parts[1]) : null) ?? 0;
-    } else {
-      reminderHour = 9;
-      reminderMinute = 0;
-      await db.setSetting('daily_reminder_time', '9:0');
-    }
+    // Schedule the two hardcoded daily pushes (08:30 + 20:00).
+    // Request permission first — on Android 13+ this is required at runtime.
     final notifService = container.read(notificationServiceProvider);
     await notifService.initialize();
-    await notifService.scheduleDailyReminder(
-      hour: reminderHour,
-      minute: reminderMinute,
-    );
+    await notifService.requestPermission();
+    await notifService.scheduleDailyReminders();
   } catch (e, st) {
     // Initialization errors must never prevent the app from launching.
     // In release builds an unhandled exception here leaves the native splash

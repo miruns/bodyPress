@@ -170,14 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     try {
       await _notifService.initialize();
       await _notifService.requestPermission();
-      await _notifService.scheduleDailyReminder(
-        hour: _notifTime.hour,
-        minute: _notifTime.minute,
-      );
-      await _dbService.setSetting(
-        'daily_reminder_time',
-        '${_notifTime.hour}:${_notifTime.minute}',
-      );
+      await _notifService.scheduleDailyReminders();
     } catch (_) {}
     if (mounted) setState(() => _busy = false);
     _next();
@@ -284,8 +277,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                     ),
                     _NotificationStep(
                       accent: const Color(0xFFA68BC1),
-                      selectedTime: _notifTime,
-                      onPickTime: _pickNotifTime,
                       onEnable: _enableDailyReminder,
                       onSkip: _next,
                       busy: _busy,
@@ -1306,8 +1297,6 @@ class _OsBadge extends StatelessWidget {
 class _NotificationStep extends StatelessWidget {
   const _NotificationStep({
     required this.accent,
-    required this.selectedTime,
-    required this.onPickTime,
     required this.onEnable,
     required this.onSkip,
     required this.busy,
@@ -1315,19 +1304,10 @@ class _NotificationStep extends StatelessWidget {
   });
 
   final Color accent;
-  final TimeOfDay selectedTime;
-  final VoidCallback onPickTime;
   final VoidCallback onEnable;
   final VoidCallback onSkip;
   final bool busy;
   final AnimationController breathe;
-
-  String get _formattedTime {
-    final h = selectedTime.hourOfPeriod == 0 ? 12 : selectedTime.hourOfPeriod;
-    final m = selectedTime.minute.toString().padLeft(2, '0');
-    final period = selectedTime.period == DayPeriod.am ? 'AM' : 'PM';
-    return '$h:$m $period';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1369,7 +1349,7 @@ class _NotificationStep extends StatelessWidget {
                 const SizedBox(height: 10),
 
                 Text(
-                  'GENTLE DAILY REMINDER',
+                  'GENTLE DAILY REMINDERS',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -1382,10 +1362,9 @@ class _NotificationStep extends StatelessWidget {
 
                 Text(
                   'Your body writes a new story every day. '
-                  'A quiet notification will let you know when '
-                  'it\'s ready to read.\n\n'
-                  'Choose a time that fits your natural rhythm — '
-                  'morning, evening, or anywhere in between.',
+                  'Two quiet notifications will keep you in the loop:\n\n'
+                  '☀️  Morning at 8:30 AM — start your day informed\n'
+                  '🌙  Evening at 8:00 PM — review your full day',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -1395,71 +1374,12 @@ class _NotificationStep extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 28),
-
-                // ── Time picker button ──
-                GestureDetector(
-                  onTap: onPickTime,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 20,
-                          color: accent,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _formattedTime,
-                          style: GoogleFonts.inter(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: accent,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.edit_outlined,
-                          size: 16,
-                          color: accent.withValues(alpha: 0.6),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                Text(
-                  'Tap to change',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.grey[500],
-                  ),
-                ),
-
                 const SizedBox(height: 24),
 
                 _PrivacyNote(
                   text:
-                      'One gentle push per day, nothing more. '
-                      'You can change the time or turn it off anytime '
-                      'in the debug panel.',
+                      'Two gentle pushes per day, nothing more. '
+                      'You can turn them off anytime.',
                   accent: accent,
                 ),
 
@@ -1475,7 +1395,7 @@ class _NotificationStep extends StatelessWidget {
           child: Column(
             children: [
               _PillButton(
-                label: 'Enable Daily Reminder',
+                label: 'Enable Daily Reminders',
                 color: accent,
                 onPressed: busy ? null : onEnable,
                 busy: busy,

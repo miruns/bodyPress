@@ -279,21 +279,13 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
 
   Future<void> _loadDailyReminder() async {
     try {
-      final timeSetting = await _db.getSetting('daily_reminder_time');
+      final enabled = await _db.getSetting('daily_reminders_enabled');
       if (mounted) {
-        if (timeSetting != null && timeSetting.isNotEmpty) {
-          final parts = timeSetting.split(':');
-          if (parts.length == 2) {
-            final h = int.tryParse(parts[0]) ?? 9;
-            final m = int.tryParse(parts[1]) ?? 0;
-            setState(() {
-              _dailyReminderEnabled = true;
-              _dailyReminderTime = TimeOfDay(hour: h, minute: m);
-            });
-          }
-        } else {
-          setState(() => _dailyReminderEnabled = false);
-        }
+        setState(() {
+          _dailyReminderEnabled = enabled == 'true';
+          // Times are now hardcoded — morning 08:30, evening 20:00
+          _dailyReminderTime = const TimeOfDay(hour: 8, minute: 30);
+        });
       }
     } catch (_) {}
   }
@@ -301,57 +293,22 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
   Future<void> _toggleDailyReminder() async {
     if (_dailyReminderEnabled) {
       // Disable
-      await _notifService.cancelDailyReminder();
-      await _db.setSetting('daily_reminder_time', '');
-      // Remove the setting by writing empty; on reload it acts as disabled.
-      // Actually let's truly remove it by overwriting, but our getSetting
-      // returns the raw string. We'll check for empty too.
-      _setActionMsg('Daily reminder disabled.');
+      await _notifService.cancelDailyReminders();
+      await _db.setSetting('daily_reminders_enabled', 'false');
+      _setActionMsg('Daily reminders disabled.');
     } else {
-      // Enable with current time
+      // Enable both hardcoded pushes
       await _notifService.initialize();
-      await _notifService.scheduleDailyReminder(
-        hour: _dailyReminderTime.hour,
-        minute: _dailyReminderTime.minute,
-      );
-      await _db.setSetting(
-        'daily_reminder_time',
-        '${_dailyReminderTime.hour}:${_dailyReminderTime.minute}',
-      );
-      _setActionMsg(
-        'Daily reminder enabled at '
-        '${_dailyReminderTime.hour.toString().padLeft(2, '0')}:'
-        '${_dailyReminderTime.minute.toString().padLeft(2, '0')}.',
-      );
+      await _notifService.scheduleDailyReminders();
+      await _db.setSetting('daily_reminders_enabled', 'true');
+      _setActionMsg('Daily reminders enabled (08:30 + 20:00).');
     }
     await _loadDailyReminder();
   }
 
   Future<void> _pickDailyReminderTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _dailyReminderTime,
-      helpText: 'Daily notification time',
-    );
-    if (picked == null || !mounted) return;
-
-    setState(() => _dailyReminderTime = picked);
-
-    if (_dailyReminderEnabled) {
-      await _notifService.scheduleDailyReminder(
-        hour: picked.hour,
-        minute: picked.minute,
-      );
-      await _db.setSetting(
-        'daily_reminder_time',
-        '${picked.hour}:${picked.minute}',
-      );
-      _setActionMsg(
-        'Reminder rescheduled to '
-        '${picked.hour.toString().padLeft(2, '0')}:'
-        '${picked.minute.toString().padLeft(2, '0')}.',
-      );
-    }
+    // Times are hardcoded — show info instead
+    _setActionMsg('Times are hardcoded: morning 08:30 + evening 20:00.');
   }
 
   Future<void> _sendTestDailyNotification() async {
@@ -2133,7 +2090,7 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  NotificationService.dailyMessages.first.title,
+                  NotificationService.morningMessages.first.title,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -2142,7 +2099,7 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  NotificationService.dailyMessages.first.body,
+                  NotificationService.morningMessages.first.body,
                   style: TextStyle(
                     fontSize: 11,
                     color: dark ? Colors.white54 : Colors.black45,

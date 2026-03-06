@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -7,10 +8,12 @@ import 'notification_content_service.dart';
 
 /// Manages local notifications for BodyPress.
 ///
-/// Two channels:
-/// - **Daily Body Blog** — a scheduled daily reminder (engaging fallback).
-/// - **Smart Insights** — data-driven notifications triggered from
-///   background captures with real biometric data.
+/// Two hardcoded daily pushes:
+/// - **Morning** at 08:30 — start-of-day motivation.
+/// - **Evening** at 20:00 — end-of-day reflection.
+///
+/// Plus a **Smart Insights** channel for data-driven notifications
+/// triggered from background captures.
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
 
@@ -22,6 +25,16 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialised = false;
+
+  // ── Hardcoded schedule ──────────────────────────────────────────────────
+
+  /// Morning push: 08:30
+  static const morningHour = 8;
+  static const morningMinute = 30;
+
+  /// Evening push: 20:00
+  static const eveningHour = 20;
+  static const eveningMinute = 0;
 
   // ── Channel IDs ─────────────────────────────────────────────────────────
 
@@ -35,125 +48,124 @@ class NotificationService {
   static const _smartChannelDescription =
       'Data-driven notifications with your real biometrics';
 
-  static const _dailyNotifId = 9001;
+  static const _morningNotifId = 9001;
+  static const _eveningNotifId = 9002;
   static const _smartNotifId = 9003;
 
-  // ── Engaging scheduled messages (emoji-rich, CTA-driven) ───────────────
-  //
-  // These are used by the scheduled daily reminder as a fallback when the
-  // smart (data-aware) notification hasn't fired yet today.  Pick is random
-  // at schedule time — still beats the old generic messages.
+  // ── Morning messages (08:30 — motivational, forward-looking) ────────────
 
-  static const dailyMessages = <({String title, String body})>[
+  static const morningMessages = <({String title, String body})>[
     (
-      title: '🧬 Your body wrote something today',
+      title: '☀️ Good morning — your body has news',
       body:
-          'Steps, sleep, heart — it\'s all there. Open your body blog and see →',
+          'Sleep score, recovery, overnight heart rate — it\'s all in your body blog →',
     ),
     (
-      title: '📖 New chapter in your body\'s diary',
-      body: 'Every day tells a different story. Today\'s is waiting →',
+      title: '🌅 Rise & read your body',
+      body: 'Your body tracked your night. See what happened while you slept →',
     ),
     (
-      title: '🔬 Your daily body report is in',
-      body: 'Real data, real insights. Read it now →',
-    ),
-    (
-      title: '💡 Your body dropped some knowledge',
+      title: '🧬 Your body wrote you an overnight report',
       body:
-          'Patterns you didn\'t notice, signals you missed. Check today\'s blog →',
+          'Sleep, heart rate, recovery — all there. Start your day informed →',
     ),
     (
-      title: '🎯 Body check-in time!',
+      title: '⚡ How charged is your body battery?',
       body:
-          'Your body tracked everything. See the summary — you might be surprised →',
+          'Sleep quality + overnight vitals = your energy forecast. Check it →',
     ),
     (
-      title: '⚡ Fresh insights from your body',
+      title: '🫀 Your body has a morning briefing',
       body:
-          'Heart, steps, sleep, mood — compiled into today\'s story. Don\'t miss it →',
+          'Heart, sleep, readiness — one tap to see how you\'re starting the day →',
     ),
     (
-      title: '🌟 Your body\'s daily dispatch',
-      body: 'No fluff, just your real biometrics as a story. Tap to read →',
-    ),
-    (
-      title: '🧠 Your body is smarter than you think',
-      body: 'It noticed things today. Check what it observed →',
-    ),
-    (
-      title: '🫀 Pulse. Steps. Sleep. Story.',
+      title: '📖 New day, new body chapter',
       body:
-          'Your body turned today\'s numbers into narrative. Read the latest →',
+          'Yesterday\'s story is written. Today\'s is just starting — check in →',
     ),
     (
-      title: '📊 Data in, story out',
-      body:
-          'Your body collected signals all day. BodyPress turned them into insight →',
+      title: '🎯 Body check-in: start of day',
+      body: 'Your body tracked everything overnight. See the summary →',
     ),
     (
-      title: '🌊 Ride today\'s body wave',
-      body:
-          'Energy, recovery, movement — your body captured the full picture →',
+      title: '🔬 Your morning body report is in',
+      body: 'Real data from your real night. Open your body blog →',
     ),
     (
-      title: '🔋 How\'s your body battery today?',
+      title: '💡 Your body knows how you slept',
+      body: 'And it has opinions. See the overnight data →',
+    ),
+    (
+      title: '🌟 Morning insight from your body',
       body:
-          'Sleep, steps, and stress all factor in. Your body blog has the answer →',
+          'Sleep, recovery, resting heart rate — today\'s baseline is ready →',
+    ),
+    (
+      title: '🏃 Ready for today?',
+      body: 'Your body measured your readiness overnight. See how you scored →',
+    ),
+    (
+      title: '🧘 A moment of body awareness',
+      body: 'Before the day takes over — check how your body is doing →',
+    ),
+  ];
+
+  // ── Evening messages (20:00 — reflective, summary-focused) ─────────────
+
+  static const eveningMessages = <({String title, String body})>[
+    (
+      title: '🌙 Your body\'s daily wrap-up',
+      body:
+          'Steps, heart, movement, environment — today\'s full story is ready →',
+    ),
+    (
+      title: '📊 End-of-day body report',
+      body: 'Your body collected data all day. See the complete picture →',
+    ),
+    (
+      title: '🔥 What did your body do today?',
+      body:
+          'Steps walked, calories burned, heart patterns — all compiled for you →',
+    ),
+    (
+      title: '📝 Your body published today\'s post',
+      body: 'A first-person account of your entire day. Written by your data →',
+    ),
+    (
+      title: '🧠 Your body noticed things today',
+      body: 'Patterns, anomalies, streaks — check what it observed →',
     ),
     (
       title: '💬 Your body left you a note',
-      body: 'With data. And insights. Open it →',
+      body: 'With real data. And real insights. Open it →',
     ),
     (
-      title: '🎤 Your body has the mic today',
-      body: 'Steps, rhythm, environment — all in today\'s narrative →',
-    ),
-    (
-      title: '🪞 Mirror check: the inside edition',
+      title: '🫀 Pulse. Steps. Story.',
       body:
-          'Forget appearances — your body blog shows what\'s really happening →',
+          'Your body turned today\'s numbers into narrative. Read the evening edition →',
     ),
     (
-      title: '📱 Your body blog just updated',
-      body: 'A day of biometrics distilled into one honest page. Read it →',
+      title: '🪞 Day in review: the inside edition',
+      body: 'Forget appearances — your body blog shows what really happened →',
     ),
     (
-      title: '🏃 Your body kept moving — and writing',
+      title: '🌊 Today\'s body wave',
+      body: 'Energy, recovery, movement — the full picture before you rest →',
+    ),
+    (
+      title: '🎤 Your body has the mic tonight',
+      body: 'Steps, rhythm, environment — all in today\'s evening narrative →',
+    ),
+    (
+      title: '🚀 Your body has end-of-day news',
       body:
-          'Every step, every heartbeat logged. See what the day looked like from inside →',
-    ),
-    (
-      title: '🫣 You haven\'t checked in yet today',
-      body: 'Your body has been talking all day. Don\'t leave it on read →',
-    ),
-    (
-      title: '🔥 Today\'s body blog is fire',
-      body: 'Your biometrics told a story worth reading. Tap to see →',
-    ),
-    (
-      title: '🧘 A moment for body awareness',
-      body: 'Pause. Breathe. Your daily body snapshot is ready →',
-    ),
-    (
-      title: '🌡️ Your body measured the day',
-      body:
-          'Temperature, heart rate, movement — all woven into today\'s narrative →',
-    ),
-    (
-      title: '📝 Your body published a post',
-      body:
-          'First-person account of your day. Written by you — literally. Read it →',
-    ),
-    (
-      title: '🚀 Your body has news',
-      body:
-          'Not just numbers — a story. Steps, rest, environment. All real. All you →',
+          'Not just numbers — a story. Steps, rest, stress. All real. All you →',
     ),
     (
       title: '🎯 One tap. Your whole day.',
       body:
-          'Your body blog summarised everything in one page. Don\'t miss today\'s →',
+          'Your body blog summarised everything. Don\'t miss tonight\'s edition →',
     ),
   ];
 
@@ -235,21 +247,57 @@ class NotificationService {
 
   // ── Daily reminder scheduling ─────────────────────────────────────────
 
-  /// Schedule a daily notification at the given [hour] and [minute].
+  /// Schedule the two hardcoded daily pushes (morning 08:30 + evening 20:00).
   ///
-  /// Replaces any previously scheduled daily reminder. The notification
-  /// picks a random message from [dailyMessages] — re-scheduled on every
-  /// app launch so the message rotates.
-  Future<void> scheduleDailyReminder({
-    required int hour,
-    required int minute,
-  }) async {
+  /// Replaces any previously scheduled reminders. Each picks a random
+  /// message from the appropriate pool — re-scheduled on every app launch
+  /// so the messages rotate.
+  Future<void> scheduleDailyReminders() async {
     await _ensureInitialised();
 
-    // Cancel any existing daily reminder first.
-    await _plugin.cancel(_dailyNotifId);
+    // Cancel any existing daily reminders first.
+    await _plugin.cancel(_morningNotifId);
+    await _plugin.cancel(_eveningNotifId);
 
-    final msg = dailyMessages[Random().nextInt(dailyMessages.length)];
+    await _scheduleOne(
+      id: _morningNotifId,
+      hour: morningHour,
+      minute: morningMinute,
+      messages: morningMessages,
+    );
+    await _scheduleOne(
+      id: _eveningNotifId,
+      hour: eveningHour,
+      minute: eveningMinute,
+      messages: eveningMessages,
+    );
+
+    debugPrint(
+      '[NotificationService] Scheduled morning ($morningHour:$morningMinute) '
+      '+ evening ($eveningHour:$eveningMinute) reminders.',
+    );
+  }
+
+  /// Cancel both daily reminders.
+  Future<void> cancelDailyReminders() async {
+    await _ensureInitialised();
+    await _plugin.cancel(_morningNotifId);
+    await _plugin.cancel(_eveningNotifId);
+  }
+
+  /// Legacy single-reminder cancel (for migration).
+  Future<void> cancelDailyReminder() async {
+    await _ensureInitialised();
+    await _plugin.cancel(_morningNotifId);
+  }
+
+  Future<void> _scheduleOne({
+    required int id,
+    required int hour,
+    required int minute,
+    required List<({String title, String body})> messages,
+  }) async {
+    final msg = messages[Random().nextInt(messages.length)];
 
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
@@ -265,11 +313,11 @@ class NotificationService {
     }
 
     await _plugin.zonedSchedule(
-      _dailyNotifId,
+      id,
       msg.title,
       msg.body,
       scheduled,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           _dailyChannelId,
           _dailyChannelName,
@@ -277,9 +325,9 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           showWhen: true,
-          styleInformation: BigTextStyleInformation(''),
+          styleInformation: BigTextStyleInformation(msg.body),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
@@ -290,12 +338,6 @@ class NotificationService {
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
-  }
-
-  /// Cancel the daily body-blog reminder.
-  Future<void> cancelDailyReminder() async {
-    await _ensureInitialised();
-    await _plugin.cancel(_dailyNotifId);
   }
 
   // ── Smart data-driven notification ──────────────────────────────────────
@@ -311,7 +353,7 @@ class NotificationService {
       _smartNotifId,
       content.title,
       content.body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           _smartChannelId,
           _smartChannelName,
@@ -319,9 +361,9 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           showWhen: true,
-          styleInformation: BigTextStyleInformation(''),
+          styleInformation: BigTextStyleInformation(content.body),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
@@ -334,13 +376,14 @@ class NotificationService {
   Future<void> showTestDailyReminder() async {
     await _ensureInitialised();
 
-    final msg = dailyMessages[Random().nextInt(dailyMessages.length)];
+    final allMessages = [...morningMessages, ...eveningMessages];
+    final msg = allMessages[Random().nextInt(allMessages.length)];
 
     await _plugin.show(
-      _dailyNotifId + 1,
+      _morningNotifId + 100, // unique test ID
       msg.title,
       msg.body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           _dailyChannelId,
           _dailyChannelName,
@@ -348,8 +391,9 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           showWhen: true,
+          styleInformation: BigTextStyleInformation(msg.body),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
