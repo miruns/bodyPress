@@ -35,9 +35,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   bool _busy = false;
   bool _healthPhase2 = false;
 
-  /// Selected daily notification time — defaults to 9:00 AM.
-  TimeOfDay _notifTime = const TimeOfDay(hour: 9, minute: 0);
-
   late final AnimationController _breathe;
 
   // ── lifecycle ──────────────────────────────────────────────────
@@ -174,17 +171,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     } catch (_) {}
     if (mounted) setState(() => _busy = false);
     _next();
-  }
-
-  Future<void> _pickNotifTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _notifTime,
-      helpText: 'When should your body check in?',
-    );
-    if (picked != null && mounted) {
-      setState(() => _notifTime = picked);
-    }
   }
 
   // ── build ─────────────────────────────────────────────────────
