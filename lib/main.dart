@@ -35,31 +35,22 @@ void main() async {
       onTimeout: () => debugPrint('[main] bgService.initialize() timed out'),
     );
 
-    // Check whether the user opted out of seeing the intro.
+    // Show onboarding only when permissions are missing.
+    // Always check actual OS permissions so that revoking them
+    // re-surfaces the onboarding flow on next launch.
     final db = container.read(localDbServiceProvider);
-    final explicitSkip = (await db.getSetting('skip_onboarding')) == 'true';
-
-    if (explicitSkip) {
-      skipOnboarding = true;
-    } else {
-      // Also skip onboarding when all critical permissions are already
-      // granted — e.g. the user revoked the "don't show again" setting
-      // but kept their OS permissions, or re-installed the app.
-      final permService = container.read(permissionServiceProvider);
-      final healthService = container.read(healthServiceProvider);
-      final criticalPerms = await permService
-          .areCriticalPermissionsGranted()
-          .timeout(const Duration(seconds: 3), onTimeout: () => false);
-      final healthPerms = await healthService.hasPermissions().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => false,
-      );
-      skipOnboarding = criticalPerms && healthPerms;
-      if (skipOnboarding) {
-        // Persist so future cold-starts skip the permission check entirely.
-        await db.setSetting('skip_onboarding', 'true');
-      }
-    }
+    final permService = container.read(permissionServiceProvider);
+    final healthService = container.read(healthServiceProvider);
+    final criticalPerms = await permService
+        .areCriticalPermissionsGranted()
+        .timeout(const Duration(seconds: 3), onTimeout: () => false);
+    final healthPerms = await healthService.hasPermissions().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => false,
+    );
+    skipOnboarding = criticalPerms && healthPerms;
+    // Keep the DB flag in sync so other parts of the app can read it.
+    await db.setSetting('skip_onboarding', skipOnboarding ? 'true' : 'false');
 
     // Schedule the two hardcoded daily pushes (08:30 + 20:00).
     // Request permission first — on Android 13+ this is required at runtime.
