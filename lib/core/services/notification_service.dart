@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import 'notification_content_service.dart';
@@ -329,6 +330,21 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
+    // Use exact alarms when the permission is granted; fall back to inexact
+    // scheduling otherwise so that reminders are still registered even when
+    // the user hasn't allowed exact alarms (Android 12+).
+    final exactAllowed = await Permission.scheduleExactAlarm.status.then(
+      (s) => s.isGranted,
+    );
+    final scheduleMode = exactAllowed
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+
+    debugPrint(
+      '[NotificationService] Scheduling id=$id at $hour:$minute '
+      '(mode: ${scheduleMode.name})',
+    );
+
     await _plugin.zonedSchedule(
       id,
       msg.title,
@@ -350,7 +366,7 @@ class NotificationService {
           presentSound: true,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: scheduleMode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
