@@ -20,7 +20,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   // 6 pages: welcome · location · health · calendar · notifications · complete
   static const _totalPages = 6;
   static const _permSteps = 4;
@@ -39,9 +39,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   // ── lifecycle ──────────────────────────────────────────────────
 
+  /// Whether we're waiting for the user to grant access inside Health Connect.
+  bool _awaitingHealthConnect = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _breathe = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -50,9 +54,37 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageCtrl.dispose();
     _breathe.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingHealthConnect) {
+      _recheckHealthPermissions();
+    }
+  }
+
+  /// Re-check health permissions after returning from Health Connect.
+  Future<void> _recheckHealthPermissions() async {
+    _awaitingHealthConnect = false;
+    setState(() => _busy = true);
+    try {
+      final granted = await _healthService.hasPermissions().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _healthPhase2 = !granted;
+      });
+      if (granted) _next();
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   // ── navigation ────────────────────────────────────────────────
@@ -130,22 +162,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   }
 
   /// Opens Health Connect so the user can finish granting data access.
-  /// Re-checks permissions when they return; advances if granted.
+  /// The lifecycle observer will re-check permissions when the user returns.
   Future<void> _openHealthConnect() async {
     setState(() => _busy = true);
     try {
+      _awaitingHealthConnect = true;
       await _healthService.openHealthConnectApp();
-      final granted = await _healthService.hasPermissions().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => false,
-      );
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _healthPhase2 = !granted;
-      });
-      if (granted) _next();
+      // The future resolves immediately on Android because it just launches
+      // an external activity. The actual permission check happens in
+      // didChangeAppLifecycleState when the user comes back.
     } catch (_) {
+      _awaitingHealthConnect = false;
       if (mounted) setState(() => _busy = false);
     }
   }
