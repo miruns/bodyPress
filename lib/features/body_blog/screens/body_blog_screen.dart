@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -191,12 +192,7 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
                       )
                     : IconButton(
                         onPressed: _refresh,
-                        icon: Icon(
-                          Icons.auto_awesome_rounded,
-                          size: 20,
-                          color: (dark ? Colors.white : Colors.black)
-                              .withValues(alpha: 0.4),
-                        ),
+                        icon: _ShimmerAiIcon(size: 20, dark: dark),
                         tooltip: 'Generate entry',
                         style: IconButton.styleFrom(
                           padding: const EdgeInsets.all(8),
@@ -522,11 +518,7 @@ class _BlogPage extends StatelessWidget {
                     )
                   : TextButton.icon(
                       onPressed: onRefresh,
-                      icon: Icon(
-                        Icons.auto_awesome_rounded,
-                        size: 14,
-                        color: primary.withValues(alpha: 0.5),
-                      ),
+                      icon: _ShimmerAiIcon(size: 14, dark: dark),
                       label: Text(
                         'Regenerate',
                         style: GoogleFonts.inter(
@@ -3103,11 +3095,7 @@ class _ToneSelectorBottomSheet extends StatelessWidget {
                       color: primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      Icons.auto_awesome_rounded,
-                      color: primary,
-                      size: 28,
-                    ),
+                    child: Center(child: _ShimmerAiIcon(size: 28, dark: dark)),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -3290,6 +3278,70 @@ class _ToneOption extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SHIMMER AI ICON — subtle color-cycling sparkle icon for AI actions
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _ShimmerAiIcon extends StatefulWidget {
+  const _ShimmerAiIcon({required this.size, required this.dark});
+  final double size;
+  final bool dark;
+
+  @override
+  State<_ShimmerAiIcon> createState() => _ShimmerAiIconState();
+}
+
+class _ShimmerAiIconState extends State<_ShimmerAiIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3200),
+  )..repeat();
+
+  /// Palette: soft gold → primary → lavender → soft gold (loop)
+  static const _colors = [
+    Color(0xFFD4A853), // warm gold
+    Color(0xFFB388FF), // soft lavender
+    Color(0xFF82B1FF), // light periwinkle
+    Color(0xFFD4A853), // back to gold for smooth loop
+  ];
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        // Smooth sine-based oscillation for an organic feel
+        final t = (math.sin(_ctrl.value * math.pi * 2) + 1) / 2;
+
+        // Interpolate through the colour stops
+        final colorIndex = (_ctrl.value * (_colors.length - 1)).floor();
+        final localT = (_ctrl.value * (_colors.length - 1)) - colorIndex;
+        final color = Color.lerp(
+          _colors[colorIndex],
+          _colors[(colorIndex + 1).clamp(0, _colors.length - 1)],
+          localT,
+        )!;
+
+        // Gentle opacity pulse (0.45 → 0.75) so it breathes
+        final alpha = 0.45 + t * 0.30;
+
+        return Icon(
+          Icons.auto_awesome_rounded,
+          size: widget.size,
+          color: color.withValues(alpha: alpha),
+        );
+      },
     );
   }
 }
