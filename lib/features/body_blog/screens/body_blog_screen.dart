@@ -66,15 +66,27 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
     super.dispose();
   }
 
-  /// Normal load — uses getTodayEntry() which returns instantly when
-  /// today's entry is persisted and no new captures exist.
+  /// Normal load — always refreshes today's entry with fresh sensor data
+  /// to ensure users see current information on app start, then loads
+  /// past entries from DB.
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final entries = await _blogService.getRecentEntries(days: _pageSize);
+      // Always refresh today's entry to show fresh data (good UX)
+      final todayEntry = await _blogService.refreshTodayEntry();
+
+      // Load past entries from DB (already persisted, no refresh needed)
+      final now = DateTime.now();
+      final pastEntries = <BodyBlogEntry>[];
+      for (var i = 1; i < _pageSize; i++) {
+        final date = now.subtract(Duration(days: i));
+        final stored = await ref.read(localDbServiceProvider).loadEntry(date);
+        if (stored != null) pastEntries.add(stored);
+      }
+
       if (mounted) {
         setState(() {
-          _entries = entries;
+          _entries = [todayEntry, ...pastEntries];
           _loading = false;
         });
       }
