@@ -67,6 +67,7 @@ dependencies:
   # Background tasks & notifications
   workmanager: ^0.9.0+3
   flutter_local_notifications: ^17.0.0
+  flutter_foreground_task: ^8.0.0
   flutter_dotenv: ^6.0.0
 
 dev_dependencies:

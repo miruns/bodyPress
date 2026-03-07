@@ -412,6 +412,9 @@ class _SensorsScreenState extends ConsumerState<SensorsScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
+                  // ── Sensor guidance tips ──
+                  if (_groups.any((g) => g.overallState != _SensorState.active))
+                    _SensorGuidanceCard(groups: _groups, dark: dark),
                   // ── Fix All Permissions banner ──
                   if (_groups.any((g) => g.hasDenied))
                     _FixAllPermissionsBanner(
@@ -753,6 +756,175 @@ class _FixAllPermissionsBanner extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SENSOR GUIDANCE CARD — contextual tips when sensors are not all active
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _GuidanceTip {
+  const _GuidanceTip({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.message,
+  });
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String message;
+}
+
+class _SensorGuidanceCard extends StatelessWidget {
+  const _SensorGuidanceCard({required this.groups, required this.dark});
+  final List<_SensorGroup> groups;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final denied = groups
+        .where((g) => g.overallState == _SensorState.denied)
+        .map((g) => g.title)
+        .toList();
+    final unavailable = groups
+        .where((g) => g.overallState == _SensorState.unavailable)
+        .map((g) => g.title)
+        .toList();
+    final idle = groups
+        .where((g) => g.overallState == _SensorState.idle)
+        .map((g) => g.title)
+        .toList();
+    final errored = groups
+        .where((g) => g.overallState == _SensorState.error)
+        .map((g) => g.title)
+        .toList();
+
+    final tips = <_GuidanceTip>[];
+
+    if (denied.isNotEmpty) {
+      tips.add(
+        _GuidanceTip(
+          icon: Icons.lock_outline_rounded,
+          color: const Color(0xFFFF5A7A),
+          title: 'Permissions needed',
+          message:
+              '${denied.join(", ")} — grant access so your body story is complete.',
+        ),
+      );
+    }
+    if (errored.isNotEmpty) {
+      tips.add(
+        _GuidanceTip(
+          icon: Icons.warning_amber_rounded,
+          color: const Color(0xFFFF5A7A),
+          title: 'Errors detected',
+          message:
+              '${errored.join(", ")} — try re-probing or restarting the app.',
+        ),
+      );
+    }
+    if (unavailable.isNotEmpty) {
+      tips.add(
+        _GuidanceTip(
+          icon: Icons.cloud_off_rounded,
+          color: const Color(0xFF60758F),
+          title: 'Unavailable',
+          message: '${unavailable.join(", ")} — not available on this device.',
+        ),
+      );
+    }
+    if (idle.isNotEmpty) {
+      tips.add(
+        _GuidanceTip(
+          icon: Icons.hourglass_empty_rounded,
+          color: const Color(0xFFFFBD5A),
+          title: 'Waiting for data',
+          message:
+              '${idle.join(", ")} — try syncing your wearable or moving around.',
+        ),
+      );
+    }
+
+    if (tips.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: dark ? const Color(0xFF1A1F2B) : const Color(0xFFF5F6FA),
+        border: Border.all(color: (dark ? Colors.white10 : Colors.black12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: dark ? Colors.white38 : Colors.black38,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'SENSOR GUIDANCE',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: dark ? Colors.white38 : Colors.black38,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...tips.map(
+            (tip) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: tip.color,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tip.title,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: tip.color,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          tip.message,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: dark ? Colors.white54 : Colors.black45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

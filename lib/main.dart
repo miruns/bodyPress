@@ -63,7 +63,33 @@ void main() async {
     final notifService = container.read(notificationServiceProvider);
     await notifService.initialize();
     await notifService.requestPermission();
+
+    // Request exact alarm permission (Android 12+) for reliable scheduling.
+    final permService2 = container.read(permissionServiceProvider);
+    await permService2.requestExactAlarmPermission().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => false,
+    );
+
     await notifService.scheduleDailyReminders();
+
+    // Request battery optimization exemption so Android doesn't kill
+    // our scheduled notifications and background captures.
+    await permService2.requestBatteryOptimizationExemption().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => false,
+    );
+
+    // Start the persistent foreground service — keeps the app alive
+    // and shows an ongoing notification so the user stays connected.
+    final fgService = container.read(foregroundTaskServiceProvider);
+    fgService.init();
+    await fgService.start().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('[main] Foreground service start timed out');
+      },
+    );
   } catch (e, st) {
     // Initialization errors must never prevent the app from launching.
     // In release builds an unhandled exception here leaves the native splash

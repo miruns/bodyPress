@@ -12,6 +12,7 @@ import 'calendar_service.dart';
 import 'capture_metadata_service.dart';
 import 'capture_service.dart';
 import 'context_window_service.dart';
+import 'foreground_task_service.dart';
 import 'gps_metrics_service.dart';
 import 'health_service.dart';
 import 'journal_ai_service.dart';
@@ -145,6 +146,11 @@ final backgroundCaptureServiceProvider = Provider<BackgroundCaptureService>((
   ref,
 ) {
   return BackgroundCaptureService(dbService: ref.read(localDbServiceProvider));
+});
+
+/// Persistent foreground service that keeps the app alive and visible.
+final foregroundTaskServiceProvider = Provider<ForegroundTaskService>((ref) {
+  return ForegroundTaskService(dbService: ref.read(localDbServiceProvider));
 });
 
 final bodyBlogServiceProvider = Provider<BodyBlogService>((ref) {

@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
@@ -182,29 +181,64 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
             children: [
               AppHeader(
                 title: 'BodyPress',
-                primaryAction: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const _SensorHealthIndicator(),
-                    _refreshing
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                primaryAction: _refreshing
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _refresh,
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
                             ),
-                          )
-                        : IconButton(
-                            onPressed: _refresh,
-                            icon: _ShimmerAiIcon(size: 20, dark: dark),
-                            tooltip: 'Generate entry',
-                            style: IconButton.styleFrom(
-                              padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color:
+                                  (dark
+                                          ? Colors.white
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.primary)
+                                      .withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color:
+                                    (dark
+                                            ? Colors.white
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.primary)
+                                        .withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _ShimmerAiIcon(size: 18, dark: dark),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "What's up?",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: dark
+                                        ? Colors.white70
+                                        : Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                  ],
-                ),
+                        ),
+                      ),
               ),
               // Health permission banner — only visible when health access
               // is not granted on the current device.
@@ -3347,135 +3381,6 @@ class _ShimmerAiIconState extends State<_ShimmerAiIcon>
           Icons.auto_awesome_rounded,
           size: widget.size,
           color: color.withValues(alpha: alpha),
-        );
-      },
-    );
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SENSOR HEALTH INDICATOR — small dot showing overall sensor status
-// ═════════════════════════════════════════════════════════════════════════════
-
-/// A compact, tappable sensor indicator that sits in the header.
-///
-/// Shows a small coloured dot with a subtle pulse:
-///   • GREEN  — health permissions granted, sensors active
-///   • AMBER  — health available but permissions not granted
-///   • GREY   — still loading / health not available
-///
-/// Tapping navigates to the full Sensors & State screen.
-class _SensorHealthIndicator extends ConsumerWidget {
-  const _SensorHealthIndicator();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    final availableAsync = ref.watch(healthAvailableProvider);
-    final permAsync = ref.watch(healthPermissionStatusProvider);
-
-    // Derive status colour
-    final Color dotColor;
-    final String tooltip;
-
-    final available = availableAsync.valueOrNull;
-    final granted = permAsync.valueOrNull;
-
-    if (available == null || granted == null) {
-      // Still loading
-      dotColor = dark ? Colors.white24 : Colors.black26;
-      tooltip = 'Checking sensors…';
-    } else if (!available) {
-      dotColor = const Color(0xFF60758F); // fog grey
-      tooltip = 'Health platform unavailable';
-    } else if (!granted) {
-      dotColor = const Color(0xFFFFBD5A); // amber
-      tooltip = 'Health permissions needed';
-    } else {
-      dotColor = const Color(0xFF38C87E); // green
-      tooltip = 'Sensors active';
-    }
-
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: () => context.push('/sensors'),
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-          child: _PulseDot(color: dotColor, needsAttention: granted == false),
-        ),
-      ),
-    );
-  }
-}
-
-/// A tiny dot that optionally pulses when attention is needed.
-class _PulseDot extends StatefulWidget {
-  const _PulseDot({required this.color, this.needsAttention = false});
-  final Color color;
-  final bool needsAttention;
-
-  @override
-  State<_PulseDot> createState() => _PulseDotState();
-}
-
-class _PulseDotState extends State<_PulseDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2000),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.needsAttention) _ctrl.repeat(reverse: true);
-  }
-
-  @override
-  void didUpdateWidget(_PulseDot old) {
-    super.didUpdateWidget(old);
-    if (widget.needsAttention && !_ctrl.isAnimating) {
-      _ctrl.repeat(reverse: true);
-    } else if (!widget.needsAttention && _ctrl.isAnimating) {
-      _ctrl.stop();
-      _ctrl.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        final scale = widget.needsAttention ? 1.0 + _ctrl.value * 0.35 : 1.0;
-        final opacity = widget.needsAttention ? 0.5 + _ctrl.value * 0.5 : 1.0;
-
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: widget.color.withValues(alpha: opacity),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.color.withValues(alpha: 0.35),
-                  blurRadius: 6,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-          ),
         );
       },
     );

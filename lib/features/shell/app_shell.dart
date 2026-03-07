@@ -2,8 +2,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/services/service_providers.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Root scaffold with a reader-inspired editorial chapter navigation.
@@ -341,7 +343,19 @@ class _ChapterNavContent extends StatelessWidget {
                         onTap(i);
                       }
                     },
-                    child: _ChapterTab(item: item, isActive: isActive),
+                    child: item.isMoreTab
+                        ? Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              _ChapterTab(item: item, isActive: isActive),
+                              const Positioned(
+                                right: 16,
+                                top: 8,
+                                child: _SensorAttentionBadge(),
+                              ),
+                            ],
+                          )
+                        : _ChapterTab(item: item, isActive: isActive),
                   ),
                 );
               }),
@@ -418,14 +432,14 @@ class _ChapterTab extends StatelessWidget {
 
 // ─── More overflow sheet ──────────────────────────────────────────────────────
 
-class _MoreSheet extends StatelessWidget {
+class _MoreSheet extends ConsumerWidget {
   const _MoreSheet({required this.routerContext});
 
   /// Context from the shell build — used for go_router navigation.
   final BuildContext routerContext;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.deepSea,
@@ -475,7 +489,10 @@ class _MoreSheet extends StatelessWidget {
               ),
             ),
 
-            // ── Destination tiles ─────────────────────────────────────────
+            // ── Sensor guidance (when not healthy) ─────────────────────────────
+            _SensorGuidanceBanner(ref: ref),
+
+            // ── Destination tiles ─────────────────────────────────────────────
             ..._moreDestinations.map(
               (dest) => _MoreTile(
                 destination: dest,
@@ -483,6 +500,9 @@ class _MoreSheet extends StatelessWidget {
                   Navigator.of(context).pop();
                   routerContext.push(dest.route);
                 },
+                badge: dest.route == '/sensors'
+                    ? _buildSensorBadgeDot(ref)
+                    : null,
               ),
             ),
 
@@ -495,10 +515,11 @@ class _MoreSheet extends StatelessWidget {
 }
 
 class _MoreTile extends StatelessWidget {
-  const _MoreTile({required this.destination, required this.onTap});
+  const _MoreTile({required this.destination, required this.onTap, this.badge});
 
   final _MoreDestination destination;
   final VoidCallback onTap;
+  final Widget? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -546,6 +567,7 @@ class _MoreTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (badge != null) ...[badge!, const SizedBox(width: 8)],
             Icon(
               Icons.chevron_right_rounded,
               size: 20,
@@ -554,6 +576,189 @@ class _MoreTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Sensor attention badge & guidance widgets ───────────────────────────────────
+
+/// Helper — builds a small pulsating dot for the Sensors tile in the More
+/// sheet. Returns [SizedBox.shrink] when everything is healthy.
+Widget _buildSensorBadgeDot(WidgetRef ref) {
+  final available = ref.watch(healthAvailableProvider).valueOrNull;
+  final granted = ref.watch(healthPermissionStatusProvider).valueOrNull;
+
+  if (available == null || granted == null) return const SizedBox.shrink();
+  if (available && granted) return const SizedBox.shrink();
+
+  final color = !available ? const Color(0xFF60758F) : const Color(0xFFFFBD5A);
+
+  return _PulseDot(color: color, size: 8, needsAttention: !granted);
+}
+
+/// Badge overlay for the More tab in the bottom nav — shows a pulsating dot
+/// when sensors need attention. Hidden when everything is healthy.
+class _SensorAttentionBadge extends ConsumerWidget {
+  const _SensorAttentionBadge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final available = ref.watch(healthAvailableProvider).valueOrNull;
+    final granted = ref.watch(healthPermissionStatusProvider).valueOrNull;
+
+    if (available == null || granted == null) return const SizedBox.shrink();
+    if (available && granted) return const SizedBox.shrink();
+
+    final color = !available
+        ? const Color(0xFF60758F)
+        : const Color(0xFFFFBD5A);
+
+    return _PulseDot(color: color, size: 7, needsAttention: !granted);
+  }
+}
+
+/// Inline guidance banner shown at the top of the More sheet when sensors are
+/// not fully healthy. Guides the user towards the Sensors screen.
+class _SensorGuidanceBanner extends StatelessWidget {
+  const _SensorGuidanceBanner({required this.ref});
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = ref.watch(healthAvailableProvider).valueOrNull;
+    final granted = ref.watch(healthPermissionStatusProvider).valueOrNull;
+
+    // All good or still loading — no banner.
+    if (available == null && granted == null) return const SizedBox.shrink();
+    if (available == true && granted == true) return const SizedBox.shrink();
+
+    final String message;
+    final Color accent;
+    final IconData icon;
+
+    if (available == false) {
+      message = 'Health platform unavailable on this device.';
+      accent = const Color(0xFF60758F);
+      icon = Icons.cloud_off_rounded;
+    } else if (granted == false) {
+      message = 'Some sensors need attention \u2014 open Sensors to review.';
+      accent = const Color(0xFFFFBD5A);
+      icon = Icons.warning_amber_rounded;
+    } else {
+      message = 'Checking sensor status\u2026';
+      accent = const Color(0xFF60758F);
+      icon = Icons.hourglass_empty_rounded;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            _PulseDot(
+              color: accent,
+              size: 10,
+              needsAttention: granted == false,
+            ),
+            const SizedBox(width: 12),
+            Icon(icon, size: 16, color: accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: accent,
+                  fontFamily: 'DM Sans',
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pulsating dot indicator that draws attention when sensors are unhealthy.
+class _PulseDot extends StatefulWidget {
+  const _PulseDot({
+    required this.color,
+    this.size = 9,
+    this.needsAttention = false,
+  });
+  final Color color;
+  final double size;
+  final bool needsAttention;
+
+  @override
+  State<_PulseDot> createState() => _PulseDotState();
+}
+
+class _PulseDotState extends State<_PulseDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.needsAttention) _ctrl.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_PulseDot old) {
+    super.didUpdateWidget(old);
+    if (widget.needsAttention && !_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    } else if (!widget.needsAttention && _ctrl.isAnimating) {
+      _ctrl.stop();
+      _ctrl.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final scale = widget.needsAttention ? 1.0 + _ctrl.value * 0.35 : 1.0;
+        final opacity = widget.needsAttention ? 0.5 + _ctrl.value * 0.5 : 1.0;
+
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.color.withValues(alpha: opacity),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.color.withValues(alpha: 0.35),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
