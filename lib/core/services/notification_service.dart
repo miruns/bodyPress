@@ -48,9 +48,15 @@ class NotificationService {
   static const _smartChannelDescription =
       'Data-driven notifications with your real biometrics';
 
+  static const persistentChannelId = 'bodypress_persistent';
+  static const _persistentChannelName = 'Body Monitoring';
+  static const _persistentChannelDescription =
+      'Keeps BodyPress connected to your body in the background';
+
   static const _morningNotifId = 9001;
   static const _eveningNotifId = 9002;
   static const _smartNotifId = 9003;
+  static const persistentNotifId = 9004;
 
   // ── Morning messages (08:30 — motivational, forward-looking) ────────────
 
@@ -210,6 +216,17 @@ class NotificationService {
           importance: Importance.high,
         ),
       );
+      await androidImpl.createNotificationChannel(
+        const AndroidNotificationChannel(
+          persistentChannelId,
+          _persistentChannelName,
+          description: _persistentChannelDescription,
+          importance: Importance.low,
+          playSound: false,
+          enableVibration: false,
+          showBadge: false,
+        ),
+      );
     }
 
     _initialised = true;
@@ -333,7 +350,7 @@ class NotificationService {
           presentSound: true,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,

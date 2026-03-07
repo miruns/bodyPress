@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class PermissionService {
@@ -66,6 +67,53 @@ class PermissionService {
     final location = await Permission.location.status;
     final activity = await Permission.activityRecognition.status;
     return location.isGranted && activity.isGranted;
+  }
+
+  // ── Battery optimization ────────────────────────────────────────────────
+
+  /// Request exemption from battery optimization (Doze mode).
+  ///
+  /// This is **critical** for reliable background notifications.  Without it,
+  /// Android aggressively kills scheduled alarms and WorkManager tasks.
+  /// Shows a system dialog — not a runtime permission prompt.
+  Future<bool> requestBatteryOptimizationExemption() async {
+    try {
+      final status = await Permission.ignoreBatteryOptimizations.status;
+      if (status.isGranted) return true;
+      final result = await Permission.ignoreBatteryOptimizations.request();
+      debugPrint('[PermissionService] Battery optimization exemption: $result');
+      return result.isGranted;
+    } catch (e) {
+      debugPrint('[PermissionService] Battery opt error: $e');
+      return false;
+    }
+  }
+
+  /// Whether the app is already exempt from battery optimization.
+  Future<bool> isBatteryOptimizationExempted() async {
+    try {
+      return await Permission.ignoreBatteryOptimizations.isGranted;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ── Exact alarm permission ──────────────────────────────────────────────
+
+  /// Request permission to schedule exact alarms (Android 12+).
+  ///
+  /// Required for `exactAllowWhileIdle` mode in flutter_local_notifications.
+  Future<bool> requestExactAlarmPermission() async {
+    try {
+      final status = await Permission.scheduleExactAlarm.status;
+      if (status.isGranted) return true;
+      final result = await Permission.scheduleExactAlarm.request();
+      debugPrint('[PermissionService] Exact alarm permission: $result');
+      return result.isGranted;
+    } catch (e) {
+      debugPrint('[PermissionService] Exact alarm error: $e');
+      return false;
+    }
   }
 
   // Open app settings if permissions are denied
