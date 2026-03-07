@@ -27,6 +27,12 @@ void main() async {
   bool skipOnboarding = false;
 
   try {
+    // Hydrate the persisted AI provider configuration before any AI calls.
+    await container
+        .read(aiConfigProvider.notifier)
+        .init()
+        .timeout(const Duration(seconds: 3), onTimeout: () {});
+
     // Initialise background capture scheduler (re-registers periodic task
     // if the user previously enabled it).
     final bgService = container.read(backgroundCaptureServiceProvider);

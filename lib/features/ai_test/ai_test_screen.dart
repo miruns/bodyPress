@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/ai_models.dart';
-import '../../core/services/ai_service_provider.dart';
+import '../../core/services/service_providers.dart';
 
 /// Simple test screen to verify AI service is working.
 ///

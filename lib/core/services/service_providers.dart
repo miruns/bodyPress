@@ -1,7 +1,9 @@
 // ignore_for_file: directives_ordering
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'ai_service_provider.dart';
+import '../models/ai_provider_config.dart';
+import 'ai_config_service.dart';
+import 'ai_service.dart';
 import 'ambient_scan_service.dart';
 import 'background_capture_service.dart';
 import 'ble_heart_rate_service.dart';
@@ -19,8 +21,10 @@ import 'notification_content_service.dart';
 import 'notification_service.dart';
 import 'permission_service.dart';
 
+export '../models/ai_provider_config.dart'
+    show AiProviderConfig, AiProviderType;
 // Re-export so callers only need to import this one file.
-export 'ai_service_provider.dart' show aiServiceProvider;
+export 'ai_config_service.dart' show AiConfigNotifier, AiConfigService;
 
 // ── Infrastructure ──────────────────────────────────────────────────────────
 
@@ -33,6 +37,34 @@ final localDbServiceProvider = Provider<LocalDbService>((ref) {
   // No explicit dispose needed — sqflite manages the connection lifecycle.
   return service;
 }, dependencies: []);
+
+// ── AI configuration (depends on DB) ────────────────────────────────────────
+
+/// Singleton service for reading/writing the AI config to SQLite.
+final aiConfigServiceProvider = Provider<AiConfigService>((ref) {
+  return AiConfigService(db: ref.read(localDbServiceProvider));
+});
+
+/// Reactive state of the active AI provider configuration.
+///
+/// Watch this from widgets to react to provider changes. The [aiServiceProvider]
+/// watches this internally so all AI calls route through the selected provider.
+final aiConfigProvider =
+    StateNotifierProvider<AiConfigNotifier, AiProviderConfig>((ref) {
+      final service = ref.read(aiConfigServiceProvider);
+      return AiConfigNotifier(service);
+    });
+
+/// Global AI service provider.
+///
+/// Automatically rebuilds when the user changes the active AI provider
+/// in the AI Settings screen (via [aiConfigProvider]).
+final aiServiceProvider = Provider<AiService>((ref) {
+  final config = ref.watch(aiConfigProvider);
+  final service = AiService(config: config.isDefault ? null : config);
+  ref.onDispose(() => service.dispose());
+  return service;
+});
 
 // ── Leaf services (no inter-service dependencies) ───────────────────────────
 

@@ -6,11 +6,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/ai_models.dart';
+import '../models/ai_provider_config.dart';
 
-/// Service for interacting with the LLM gateway at ai.governor-hq.com
+/// Service for interacting with any OpenAI-compatible LLM gateway.
 ///
-/// This service provides access to OpenAI-compatible chat completions
-/// through a self-hosted gateway that abstracts the underlying LLM provider.
+/// When no [AiProviderConfig] is supplied the service falls back to the
+/// built-in BodyPress Cloud gateway at `ai.governor-hq.com`, preserving
+/// full backward compatibility.
 ///
 /// Example usage:
 /// ```dart
@@ -21,7 +23,8 @@ import '../models/ai_models.dart';
 /// print(response.content);
 /// ```
 class AiService {
-  static const String _baseUrl = 'https://ai.governor-hq.com';
+  /// Default gateway when no config override is provided.
+  static const String _defaultBaseUrl = 'https://ai.governor-hq.com';
 
   /// HTTP status codes that are transient and safe to retry.
   static const _retryableStatusCodes = {429, 503, 529};
@@ -30,17 +33,45 @@ class AiService {
   static const _maxAttempts = 3;
 
   /// API key resolved in order:
-  ///  1. Compile-time `--dart-define=AI_API_KEY=...` (CI builds)
-  ///  2. Runtime `.env` file loaded by flutter_dotenv (local dev)
-  static String get _apiKey {
+  ///  1. Explicit config from AI Settings screen
+  ///  2. Compile-time `--dart-define=AI_API_KEY=...` (CI builds)
+  ///  3. Runtime `.env` file loaded by flutter_dotenv (local dev)
+  static String get _envApiKey {
     const compiled = String.fromEnvironment('AI_API_KEY');
     if (compiled.isNotEmpty) return compiled;
     return dotenv.env['AI_API_KEY'] ?? '';
   }
 
   final http.Client _client;
+  final AiProviderConfig? _config;
 
-  AiService({http.Client? client}) : _client = client ?? http.Client();
+  /// The effective base URL: user-configured or default gateway.
+  String get _baseUrl {
+    final url = _config?.baseUrl ?? '';
+    return url.isNotEmpty
+        ? url.replaceAll(RegExp(r'/+$'), '')
+        : _defaultBaseUrl;
+  }
+
+  /// The effective API key: user-configured key, or env/compile-time fallback.
+  String get _apiKey {
+    final configKey = _config?.apiKey ?? '';
+    return configKey.isNotEmpty ? configKey : _envApiKey;
+  }
+
+  /// The effective model name, or `null` to let the gateway pick.
+  String? get _model {
+    final m = _config?.model ?? '';
+    return m.isNotEmpty ? m : null;
+  }
+
+  /// The active provider type for debug / logging.
+  AiProviderType get providerType =>
+      _config?.type ?? AiProviderType.bodyPressCloud;
+
+  AiService({http.Client? client, AiProviderConfig? config})
+    : _client = client ?? http.Client(),
+      _config = config;
 
   /// Send a chat completion request with the given messages.
   ///
@@ -57,7 +88,7 @@ class AiService {
   }) async {
     final request = ChatCompletionRequest(
       messages: messages,
-      model: model,
+      model: model ?? _model,
       temperature: temperature,
       maxTokens: maxTokens,
       stream: false,

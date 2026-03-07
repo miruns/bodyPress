@@ -114,6 +114,12 @@ class _MoreDestination {
 /// a permanent spot in the primary navigation.
 const List<_MoreDestination> _moreDestinations = [
   _MoreDestination(
+    icon: Icons.auto_awesome_rounded,
+    label: 'AI Services',
+    route: '/ai-settings',
+    description: 'Choose your AI provider & API keys',
+  ),
+  _MoreDestination(
     icon: Icons.sensors_rounded,
     label: 'Sensors',
     route: '/sensors',
