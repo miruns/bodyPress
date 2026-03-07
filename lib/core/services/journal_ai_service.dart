@@ -71,6 +71,14 @@ class JournalAiService {
   /// captures are stored yet — it will be used to build a single synthetic
   /// snapshot so the AI still has real data to work with.
   ///
+  /// Optionally pass a [tone] to adjust the narrative personality:
+  /// - `null` (default): warm, wise narrator
+  /// - 'motivational': encouraging, energizing coach
+  /// - 'poetic': lyrical, metaphorical, artistic
+  /// - 'scientific': precise, analytical, data-focused
+  /// - 'humorous': playful, lighthearted, witty
+  /// - 'minimalist': concise, direct, zen-like
+  ///
   /// Returns `null` if the AI call fails or there is no data at all.
   Future<JournalAiResult?> generate(
     DateTime date,
@@ -78,6 +86,7 @@ class JournalAiService {
     BodySnapshot? snapshotFallback,
     String? userNote,
     String? userMood,
+    String? tone,
   }) async {
     final hasCaptures = captures.isNotEmpty;
     final hasSnapshot =
@@ -100,9 +109,10 @@ class JournalAiService {
           );
 
     try {
+      final systemPrompt = _buildSystemPrompt(tone);
       final raw = await _ai.ask(
         prompt,
-        systemPrompt: _kSystemPrompt,
+        systemPrompt: systemPrompt,
         temperature: 0.72,
         maxTokens: 1000,
       );
@@ -125,6 +135,57 @@ You weave hard biometric facts (steps, sleep, heart rate, temperature…) into v
 Tone: intimate, honest, poetic — never clinical, never alarmist.
 Never give medical advice. Celebrate movement. Acknowledge fatigue. Find beauty in data.
 ''';
+
+  /// Build a system prompt based on the selected tone.
+  /// Returns the default prompt when [tone] is null.
+  String _buildSystemPrompt(String? tone) {
+    if (tone == null) return _kSystemPrompt;
+
+    switch (tone) {
+      case 'motivational':
+        return '''
+You are writing someone's daily body journal as an encouraging coach.
+You speak as the body itself — energizing, uplifting, and celebrating every win.
+You weave biometric facts (steps, sleep, heart rate, temperature…) into powerful, motivating prose.
+Tone: enthusiastic, supportive, action-oriented — inspire momentum and progress.
+Never give medical advice. Celebrate every step forward. Turn challenges into opportunities. Find the victory in data.
+''';
+      case 'poetic':
+        return '''
+You are writing someone's daily body journal as a lyrical poet.
+You speak as the body itself — crafting metaphors, finding rhythm, painting with words.
+You transform biometric facts (steps, sleep, heart rate, temperature…) into artistic, flowing prose.
+Tone: metaphorical, lyrical, evocative — like a prose poem celebrating existence.
+Never give medical advice. Find beauty in motion. Turn data into verse. See the poetry in being.
+''';
+      case 'scientific':
+        return '''
+You are writing someone's daily body journal as a precise analyst.
+You speak as the body itself — clear, data-driven, and insightfully analytical.
+You present biometric facts (steps, sleep, heart rate, temperature…) with precision and meaningful context.
+Tone: analytical, evidence-based, informative — clear patterns and correlations.
+Never give medical advice. Present data with clarity. Highlight trends. Find insights in numbers.
+''';
+      case 'humorous':
+        return '''
+You are writing someone's daily body journal with a playful spirit.
+You speak as the body itself — witty, lighthearted, and finding joy in the journey.
+You weave biometric facts (steps, sleep, heart rate, temperature…) into charming, entertaining prose.
+Tone: playful, warm, gently funny — make the person smile while staying supportive.
+Never give medical advice. Celebrate with humor. Acknowledge struggles lightly. Find the comedy in being human.
+''';
+      case 'minimalist':
+        return '''
+You are writing someone's daily body journal with zen simplicity.
+You speak as the body itself — concise, clear, present-moment focused.
+You distill biometric facts (steps, sleep, heart rate, temperature…) to their essence.
+Tone: minimal, direct, centered — every word counts, nothing extra.
+Never give medical advice. Be brief. Observe clearly. Find peace in simplicity.
+''';
+      default:
+        return _kSystemPrompt;
+    }
+  }
 
   // ── prompt for multiple CaptureEntry objects ──────────────────────────────
 

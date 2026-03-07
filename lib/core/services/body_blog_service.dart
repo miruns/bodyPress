@@ -109,7 +109,9 @@ class BodyBlogService {
   /// runs AI with *all* today's captures, and persists.
   ///
   /// Called by the user-facing "refresh" button.
-  Future<BodyBlogEntry> refreshTodayEntry() async {
+  ///
+  /// Optionally pass a [tone] to adjust the narrative personality.
+  Future<BodyBlogEntry> refreshTodayEntry({String? tone}) async {
     final now = DateTime.now();
     final snapshot = await _collectSnapshot();
     // Persist a capture so the Capture & Patterns pages stay in sync.
@@ -132,7 +134,7 @@ class BodyBlogService {
     await _db.saveEntry(entry);
     await _db.appendVersion(entry, BlogVersionTrigger.draft);
 
-    final enriched = await _applyAi(now, entry, snapshot);
+    final enriched = await _applyAi(now, entry, snapshot, tone: tone);
     if (!identical(enriched, entry)) {
       entry = enriched;
       await _db.saveEntry(entry);
@@ -300,11 +302,14 @@ class BodyBlogService {
   /// When [captureOverride] is provided, those captures are sent to the AI
   /// instead of loading all captures for the date (used for incremental
   /// updates with only the new unprocessed captures).
+  ///
+  /// Optionally pass a [tone] to adjust the narrative personality.
   Future<BodyBlogEntry> _applyAi(
     DateTime date,
     BodyBlogEntry entry,
     BodySnapshot? snapshotFallback, {
     List<CaptureEntry>? captureOverride,
+    String? tone,
   }) async {
     try {
       final captures =
@@ -320,6 +325,7 @@ class BodyBlogService {
             snapshotFallback: snapshotFallback,
             userNote: entry.userNote,
             userMood: entry.userMood,
+            tone: tone,
           )
           .timeout(const Duration(seconds: 45));
 

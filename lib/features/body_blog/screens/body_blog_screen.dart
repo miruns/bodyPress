@@ -95,13 +95,25 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
     }
   }
 
-  /// Explicit refresh — collects fresh sensors + AI for today and
-  /// refreshes the displayed list.
+  /// Explicit refresh — shows a tone selector bottom sheet, then collects fresh
+  /// sensors + AI for today and refreshes the displayed list.
   Future<void> _refresh() async {
     if (_refreshing) return;
+
+    // Show tone selector bottom sheet
+    final tone = await showModalBottomSheet<String?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ToneSelectorBottomSheet(),
+    );
+
+    // User cancelled
+    if (!mounted || tone == null) return;
+
     setState(() => _refreshing = true);
     try {
-      final fresh = await _blogService.refreshTodayEntry();
+      final fresh = await _blogService.refreshTodayEntry(tone: tone);
       if (mounted) {
         // Replace today's entry (index 0) with the refreshed version.
         setState(() {
@@ -177,8 +189,16 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
                       )
                     : IconButton(
                         onPressed: _refresh,
-                        icon: const Icon(Icons.refresh_rounded, size: 22),
-                        tooltip: 'Refresh today',
+                        icon: Icon(
+                          Icons.chat_bubble_outline,
+                          size: 20,
+                          color: (dark ? Colors.white : Colors.black)
+                              .withValues(alpha: 0.4),
+                        ),
+                        tooltip: 'Ask what\'s up',
+                        style: IconButton.styleFrom(
+                          padding: const EdgeInsets.all(8),
+                        ),
                       ),
               ),
               // Health permission banner — only visible when health access
@@ -258,17 +278,33 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
   }
 
   Widget _emptyState(bool dark) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Text(
-          'Your body journal is preparing…\nPull down to refresh.',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: dark ? Colors.white54 : Colors.black38,
-            height: 1.8,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Ready to check in?',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: dark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Tap the chat icon above to start a conversation',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: dark ? Colors.white38 : Colors.black38,
+                height: 1.6,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -474,7 +510,7 @@ class _BlogPage extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'Gathering your story…',
+                          'Gathering your story...',
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
@@ -486,27 +522,27 @@ class _BlogPage extends StatelessWidget {
                   : TextButton.icon(
                       onPressed: onRefresh,
                       icon: Icon(
-                        Icons.auto_awesome_rounded,
-                        size: 16,
-                        color: primary.withValues(alpha: 0.7),
+                        Icons.chat_bubble_outline,
+                        size: 14,
+                        color: primary.withValues(alpha: 0.5),
                       ),
                       label: Text(
-                        'Refresh day',
+                        'Ask again',
                         style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: primary.withValues(alpha: 0.7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: primary.withValues(alpha: 0.5),
                         ),
                       ),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
+                          horizontal: 16,
+                          vertical: 8,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                           side: BorderSide(
-                            color: primary.withValues(alpha: 0.15),
+                            color: primary.withValues(alpha: 0.1),
                           ),
                         ),
                       ),
@@ -1548,12 +1584,12 @@ class _DataTile extends StatelessWidget {
 // ═════════════════════════════════════════════════════════════════════════════
 
 const _zenPhrases = [
-  'Sensing your rhythm…',
-  'Reading between the heartbeats…',
-  'Composing your story…',
-  'Weaving your day together…',
-  'Finding the thread…',
-  'Listening to your body…',
+  'Sensing your rhythm...',
+  'Reading between the heartbeats...',
+  'Composing your story...',
+  'Weaving your day together...',
+  'Finding the thread...',
+  'Listening to your body...',
 ];
 
 class _ZenLoader extends StatefulWidget {
@@ -1859,8 +1895,8 @@ class _FirstVisitBootstrapState extends State<_FirstVisitBootstrap>
                       _stageIndex == 0
                           ? 'Setting up · first run only'
                           : _stageIndex == 1
-                          ? 'Composing your story…'
-                          : 'Almost there…',
+                          ? 'Composing your story...'
+                          : 'Almost there...',
                       key: ValueKey<int>(_stageIndex),
                       style: GoogleFonts.inter(
                         fontSize: 12,
@@ -2035,7 +2071,7 @@ class _PipelineStage extends StatelessWidget {
                           fontWeight: FontWeight.w300,
                           color: subColor,
                         ),
-                        child: Text(isActive ? '$description…' : description),
+                        child: Text(isActive ? '$description...' : description),
                       ),
                     ],
                   ),
@@ -2471,7 +2507,7 @@ class _BlogDetailPageState extends ConsumerState<_BlogDetailPage> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Writing…',
+                            'Writing...',
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               color: primary.withValues(alpha: 0.6),
@@ -3011,6 +3047,250 @@ class _VersionTile extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TONE SELECTOR BOTTOM SHEET — chat-like interface to generate new entry
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _ToneSelectorBottomSheet extends StatelessWidget {
+  const _ToneSelectorBottomSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final bgColor = dark ? const Color(0xFF1C1C1E) : Colors.white;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.9,
+      builder: (_, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            const SizedBox(height: 12),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: (dark ? Colors.white : Colors.black).withValues(
+                  alpha: 0.2,
+                ),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Header with icon
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.chat_bubble_outline,
+                      color: primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Generate a New Entry',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: dark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Collect fresh data from your body and create a new story with your chosen tone',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: dark ? Colors.white60 : Colors.black54,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // Tone options label
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Choose Your Tone',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: dark ? Colors.white54 : Colors.black45,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Tone options (scrollable)
+            Expanded(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                children: [
+                  _ToneOption(
+                    icon: Icons.auto_awesome,
+                    label: 'Default',
+                    description: 'Warm, wise, intimate narrator',
+                    tone: null,
+                    dark: dark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ToneOption(
+                    icon: Icons.rocket_launch,
+                    label: 'Motivational',
+                    description: 'Energizing, encouraging coach',
+                    tone: 'motivational',
+                    dark: dark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ToneOption(
+                    icon: Icons.auto_stories,
+                    label: 'Poetic',
+                    description: 'Lyrical, metaphorical, artistic',
+                    tone: 'poetic',
+                    dark: dark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ToneOption(
+                    icon: Icons.science,
+                    label: 'Scientific',
+                    description: 'Precise, analytical, data-focused',
+                    tone: 'scientific',
+                    dark: dark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ToneOption(
+                    icon: Icons.sentiment_very_satisfied,
+                    label: 'Humorous',
+                    description: 'Playful, lighthearted, witty',
+                    tone: 'humorous',
+                    dark: dark,
+                  ),
+                  const SizedBox(height: 12),
+                  _ToneOption(
+                    icon: Icons.spa,
+                    label: 'Minimalist',
+                    description: 'Concise, direct, zen-like',
+                    tone: 'minimalist',
+                    dark: dark,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToneOption extends StatelessWidget {
+  const _ToneOption({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.tone,
+    required this.dark,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final String? tone;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(tone),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: dark ? Colors.white10 : Colors.black12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: primary, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: dark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: dark ? Colors.white54 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: dark ? Colors.white24 : Colors.black26,
+            ),
+          ],
         ),
       ),
     );
