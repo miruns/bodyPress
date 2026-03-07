@@ -157,7 +157,7 @@ class _BodyPressTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    _updateNotification();
+    unawaited(_updateNotification());
   }
 
   @override
@@ -187,7 +187,7 @@ class _BodyPressTaskHandler extends TaskHandler {
         }
       }
 
-      FlutterForegroundTask.updateService(
+      await FlutterForegroundTask.updateService(
         notificationTitle: '🫀 BodyPress',
         notificationText: text,
       );
