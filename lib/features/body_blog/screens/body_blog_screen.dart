@@ -12,7 +12,6 @@ import '../../../core/models/body_blog_version.dart';
 import '../../../core/services/service_providers.dart';
 import '../../shared/widgets/app_header.dart';
 import '../../shared/widgets/health_permission_card.dart';
-import '../widgets/body_harmony_ring.dart';
 import '../widgets/insight_reflection_card.dart';
 import '../widgets/social_card.dart';
 
@@ -514,11 +513,6 @@ class _BlogPage extends StatelessWidget {
           _SnapshotGlance(snapshot: entry.snapshot),
 
           const SizedBox(height: 28),
-
-          // ── body harmony ring — radial vitals visualization ──
-          BodyHarmonyRing(snapshot: entry.snapshot),
-
-          const SizedBox(height: 20),
 
           // ── insight reflection — personal body-mind insight ──
           InsightReflectionCard(entry: entry),
