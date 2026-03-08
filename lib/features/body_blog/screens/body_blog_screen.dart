@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +38,9 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
   bool _loadingMore = false;
   bool _isFirstVisit = false;
   bool _sharing = false;
+  int _refreshStage = 0; // 0=sensing, 1=drafting, 2=composing, 3=done
+  String? _selectedToneName;
+  Timer? _refreshStageTimer;
   static const int _pageSize = 7;
 
   @override
@@ -61,6 +65,7 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
 
   @override
   void dispose() {
+    _refreshStageTimer?.cancel();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -96,6 +101,12 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
 
   /// Explicit refresh — shows a tone selector bottom sheet, then collects fresh
   /// sensors + AI for today and refreshes the displayed list.
+  ///
+  /// The overlay pipeline tracks three visual stages:
+  /// 0  Sensing  – collecting health / location / calendar
+  /// 1  Drafting – saving local draft snapshot
+  /// 2  Composing – AI writing the narrative
+  /// 3  Done     – brief completion flourish
   Future<void> _refresh() async {
     if (_refreshing) return;
 
@@ -110,12 +121,25 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
     // User cancelled (dismissed the sheet without picking a tone)
     if (!mounted || tone == null) return;
 
-    setState(() => _refreshing = true);
+    setState(() {
+      _refreshing = true;
+      _refreshStage = 0;
+      _selectedToneName = _toneDisplayName(tone);
+    });
+
+    // Start timer-based stage progression (approximate durations)
+    _startRefreshStageProgression();
+
     try {
       // 'default' is a sentinel — the service expects null for the default tone.
       final effectiveTone = tone == 'default' ? null : tone;
       final fresh = await _blogService.refreshTodayEntry(tone: effectiveTone);
+      _refreshStageTimer?.cancel();
       if (mounted) {
+        // Show "done" stage briefly
+        setState(() => _refreshStage = 3);
+        await Future.delayed(const Duration(milliseconds: 900));
+        if (!mounted) return;
         // Replace today's entry (index 0) with the refreshed version.
         setState(() {
           if (_entries.isNotEmpty) {
@@ -124,11 +148,50 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
             _entries = [fresh];
           }
           _refreshing = false;
+          _refreshStage = 0;
+          _selectedToneName = null;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _refreshing = false);
+      _refreshStageTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _refreshing = false;
+          _refreshStage = 0;
+          _selectedToneName = null;
+        });
+      }
     }
+  }
+
+  /// Advance stages on approximate timers so the overlay feels alive even
+  /// though the actual service call is a single Future.
+  void _startRefreshStageProgression() {
+    _refreshStageTimer?.cancel();
+    // Stage 0 → 1 after ~4s (sensor reads finish fast)
+    _refreshStageTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted || !_refreshing || _refreshStage != 0) return;
+      setState(() => _refreshStage = 1);
+      // Stage 1 → 2 after ~2s (local draft save)
+      _refreshStageTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted || !_refreshing || _refreshStage != 1) return;
+        setState(() => _refreshStage = 2);
+      });
+    });
+  }
+
+  /// Map tone key to a user-friendly display name.
+  static String _toneDisplayName(String tone) {
+    const map = {
+      'default': 'Default',
+      'motivational': 'Motivational',
+      'poetic': 'Poetic',
+      'scientific': 'Scientific',
+      'humorous': 'Humorous',
+      'philosophical': 'Philosophical',
+      'minimal': 'Minimal',
+    };
+    return map[tone] ?? tone;
   }
 
   /// Lazily fetch older entries when the user approaches the end.
@@ -242,70 +305,86 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
               // is not granted on the current device.
               const HealthPermissionCard(),
               Expanded(
-                child: _loading
-                    ? (_isFirstVisit
-                          ? const _FirstVisitBootstrap()
-                          : const Center(child: _ZenLoader()))
-                    : _entries.isEmpty
-                    ? _emptyState(dark)
-                    : Column(
-                        children: [
-                          Expanded(
-                            child: Stack(
-                              children: [
-                                PageView.builder(
-                                  controller: _pageCtrl,
-                                  itemCount: _entries.length,
-                                  onPageChanged: (i) {
-                                    setState(() => _currentPage = i);
-                                    // Pre-fetch older entries when nearing the end
-                                    if (i >= _entries.length - 3) _loadMore();
-                                  },
-                                  itemBuilder: (ctx, i) => _BlogPage(
-                                    entry: _entries[i],
-                                    onReadMore: () =>
-                                        _openDetail(context, _entries[i]),
-                                    isToday: i == 0,
-                                    isRefreshing: _refreshing,
-                                    onRefresh: _refresh,
-                                    onViewHistory: () =>
-                                        _showHistory(context, _entries[i].date),
-                                  ),
-                                ),
-
-                                // Floating "Today" pill — visible only when away from today
-                                if (_currentPage > 0)
-                                  Positioned(
-                                    bottom: 16,
-                                    left: 0,
-                                    right: 0,
-                                    child: Center(
-                                      child: _TodayPill(onTap: _goToday),
+                child: Stack(
+                  children: [
+                    // ── Main content ──
+                    _loading
+                        ? (_isFirstVisit
+                              ? const _FirstVisitBootstrap()
+                              : const Center(child: _ZenLoader()))
+                        : _entries.isEmpty
+                        ? _emptyState(dark)
+                        : Column(
+                            children: [
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    PageView.builder(
+                                      controller: _pageCtrl,
+                                      itemCount: _entries.length,
+                                      onPageChanged: (i) {
+                                        setState(() => _currentPage = i);
+                                        // Pre-fetch older entries when nearing the end
+                                        if (i >= _entries.length - 3) {
+                                          _loadMore();
+                                        }
+                                      },
+                                      itemBuilder: (ctx, i) => _BlogPage(
+                                        entry: _entries[i],
+                                        onReadMore: () =>
+                                            _openDetail(context, _entries[i]),
+                                        isToday: i == 0,
+                                        isRefreshing: _refreshing,
+                                        onRefresh: _refresh,
+                                        onViewHistory: () => _showHistory(
+                                          context,
+                                          _entries[i].date,
+                                        ),
+                                      ),
                                     ),
-                                  ),
 
-                                // Floating share FAB — bottom-right, clears DateNav
-                                Positioned(
-                                  bottom: 16,
-                                  right: 20,
-                                  child: _ShareFab(
-                                    sharing: _sharing,
-                                    onShare: _entries.isNotEmpty
-                                        ? _shareCurrentEntry
-                                        : null,
-                                  ),
+                                    // Floating "Today" pill — visible only when away from today
+                                    if (_currentPage > 0)
+                                      Positioned(
+                                        bottom: 16,
+                                        left: 0,
+                                        right: 0,
+                                        child: Center(
+                                          child: _TodayPill(onTap: _goToday),
+                                        ),
+                                      ),
+
+                                    // Floating share FAB — bottom-right, clears DateNav
+                                    Positioned(
+                                      bottom: 16,
+                                      right: 20,
+                                      child: _ShareFab(
+                                        sharing: _sharing,
+                                        onShare: _entries.isNotEmpty
+                                            ? _shareCurrentEntry
+                                            : null,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              _DateNav(
+                                entries: _entries,
+                                current: _currentPage,
+                                onPrev: () => _goPage(_currentPage - 1),
+                                onNext: () => _goPage(_currentPage + 1),
+                              ),
+                            ],
                           ),
-                          _DateNav(
-                            entries: _entries,
-                            current: _currentPage,
-                            onPrev: () => _goPage(_currentPage - 1),
-                            onNext: () => _goPage(_currentPage + 1),
-                          ),
-                        ],
+
+                    // ── Refresh journey overlay ──
+                    if (_refreshing)
+                      _RefreshJourneyOverlay(
+                        stage: _refreshStage,
+                        toneName: _selectedToneName,
                       ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1596,6 +1675,511 @@ class _DataTile extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  REFRESH JOURNEY OVERLAY — immersive pipeline shown while regenerating
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Phrases that rotate during the AI composing stage to keep the user engaged.
+const _refreshJourneyPhrases = [
+  'Weaving your day together...',
+  'Connecting the dots...',
+  'Finding your narrative arc...',
+  'Crafting every sentence...',
+  'Almost ready to share...',
+  'Putting the finishing touches...',
+];
+
+class _RefreshJourneyOverlay extends StatefulWidget {
+  const _RefreshJourneyOverlay({required this.stage, this.toneName});
+
+  /// 0 = sensing, 1 = drafting, 2 = composing, 3 = done
+  final int stage;
+  final String? toneName;
+
+  @override
+  State<_RefreshJourneyOverlay> createState() => _RefreshJourneyOverlayState();
+}
+
+class _RefreshJourneyOverlayState extends State<_RefreshJourneyOverlay>
+    with TickerProviderStateMixin {
+  late final AnimationController _breatheCtrl;
+  late final AnimationController _shimmerCtrl;
+  late final AnimationController _entryFade;
+  late final AnimationController _progressCtrl;
+  late final List<AnimationController> _stageFadeCtrls;
+  late final List<Animation<double>> _stageFadeAnims;
+  Timer? _phraseTimer;
+  int _phraseIndex = 0;
+  int _elapsed = 0;
+  late final Stopwatch _sw;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _breatheCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat(reverse: true);
+
+    _shimmerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+
+    _entryFade = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+
+    _progressCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    // Fade controllers for each pipeline stage row
+    _stageFadeCtrls = List.generate(
+      4,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      ),
+    );
+    _stageFadeAnims = _stageFadeCtrls
+        .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOut))
+        .toList();
+
+    // Stagger stage rows in
+    for (var i = 0; i < _stageFadeCtrls.length; i++) {
+      Future.delayed(Duration(milliseconds: 120 * i), () {
+        if (mounted) _stageFadeCtrls[i].forward();
+      });
+    }
+
+    _sw = Stopwatch()..start();
+    _phraseTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _elapsed = _sw.elapsed.inSeconds;
+        if (_elapsed > 0 && _elapsed % 4 == 0) {
+          _phraseIndex = (_phraseIndex + 1) % _refreshJourneyPhrases.length;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _phraseTimer?.cancel();
+    _breatheCtrl.dispose();
+    _shimmerCtrl.dispose();
+    _entryFade.dispose();
+    _progressCtrl.dispose();
+    for (final c in _stageFadeCtrls) {
+      c.dispose();
+    }
+    _sw.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+    final stage = widget.stage;
+    final isDone = stage >= 3;
+
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: _entryFade, curve: Curves.easeOut),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: AnimatedBuilder(
+            animation: _breatheCtrl,
+            builder: (context, _) => Container(
+              color: dark
+                  ? Colors.black.withValues(alpha: 0.82)
+                  : Colors.white.withValues(alpha: 0.88),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.35),
+                    radius: 1.2 + _breatheCtrl.value * 0.2,
+                    colors: [
+                      primary.withValues(
+                        alpha:
+                            (dark ? 0.05 : 0.03) +
+                            _breatheCtrl.value * (dark ? 0.04 : 0.025),
+                      ),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 36),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // ── Breathing orb ──
+                      Transform.scale(
+                        scale: isDone ? 1.05 : 0.92 + _breatheCtrl.value * 0.08,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 500),
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDone
+                                ? primary.withValues(alpha: 0.15)
+                                : primary.withValues(alpha: 0.06),
+                            border: Border.all(
+                              color: isDone
+                                  ? primary.withValues(alpha: 0.5)
+                                  : primary.withValues(
+                                      alpha: 0.25 + _breatheCtrl.value * 0.2,
+                                    ),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 400),
+                            child: isDone
+                                ? Icon(
+                                    Icons.check_rounded,
+                                    key: const ValueKey('done'),
+                                    color: primary,
+                                    size: 26,
+                                  )
+                                : Icon(
+                                    Icons.auto_awesome_rounded,
+                                    key: const ValueKey('loading'),
+                                    color: primary.withValues(
+                                      alpha: 0.5 + _breatheCtrl.value * 0.4,
+                                    ),
+                                    size: 24,
+                                  ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // ── Tone badge ──
+                      if (widget.toneName != null)
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 300),
+                          opacity: isDone ? 0.4 : 0.8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: primary.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Text(
+                              '${widget.toneName} voice',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: primary.withValues(alpha: 0.7),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 36),
+
+                      // ── Pipeline stages ──
+                      _RefreshPipelineRow(
+                        index: 0,
+                        activeStage: stage,
+                        fade: _stageFadeAnims[0],
+                        breathe: _breatheCtrl,
+                        shimmer: _shimmerCtrl,
+                        primary: primary,
+                        dark: dark,
+                        label: 'Reading your body',
+                        description: 'Steps · Heart rate · Sleep · GPS',
+                        icon: Icons.sensors_rounded,
+                      ),
+                      _RefreshPipelineConnector(primary: primary, dark: dark),
+                      _RefreshPipelineRow(
+                        index: 1,
+                        activeStage: stage,
+                        fade: _stageFadeAnims[1],
+                        breathe: _breatheCtrl,
+                        shimmer: _shimmerCtrl,
+                        primary: primary,
+                        dark: dark,
+                        label: 'Saving snapshot',
+                        description: 'Protecting your data first',
+                        icon: Icons.save_outlined,
+                      ),
+                      _RefreshPipelineConnector(primary: primary, dark: dark),
+                      _RefreshPipelineRow(
+                        index: 2,
+                        activeStage: stage,
+                        fade: _stageFadeAnims[2],
+                        breathe: _breatheCtrl,
+                        shimmer: _shimmerCtrl,
+                        primary: primary,
+                        dark: dark,
+                        label: 'AI composing',
+                        description: 'Writing your personal narrative',
+                        icon: Icons.auto_awesome_rounded,
+                      ),
+                      _RefreshPipelineConnector(primary: primary, dark: dark),
+                      _RefreshPipelineRow(
+                        index: 3,
+                        activeStage: stage,
+                        fade: _stageFadeAnims[3],
+                        breathe: _breatheCtrl,
+                        shimmer: _shimmerCtrl,
+                        primary: primary,
+                        dark: dark,
+                        label: 'Ready',
+                        description: 'Your story has been written',
+                        icon: Icons.auto_stories_rounded,
+                      ),
+
+                      const SizedBox(height: 40),
+
+                      // ── Rotating phrase ──
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 500),
+                        child: isDone
+                            ? Text(
+                                'Your entry is ready ✦',
+                                key: const ValueKey('done-phrase'),
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  color: primary.withValues(alpha: 0.7),
+                                ),
+                              )
+                            : Text(
+                                _refreshJourneyPhrases[_phraseIndex],
+                                key: ValueKey<int>(_phraseIndex),
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w300,
+                                  letterSpacing: 0.3,
+                                  color: dark
+                                      ? Colors.white.withValues(alpha: 0.30)
+                                      : Colors.black.withValues(alpha: 0.30),
+                                ),
+                              ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── Elapsed time ──
+                      if (_elapsed >= 5)
+                        Text(
+                          '${_elapsed}s',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: dark
+                                ? Colors.white.withValues(alpha: 0.20)
+                                : Colors.black.withValues(alpha: 0.20),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Refresh pipeline row ────────────────────────────────────────────────────
+
+class _RefreshPipelineRow extends StatelessWidget {
+  const _RefreshPipelineRow({
+    required this.index,
+    required this.activeStage,
+    required this.fade,
+    required this.breathe,
+    required this.shimmer,
+    required this.primary,
+    required this.dark,
+    required this.label,
+    required this.description,
+    required this.icon,
+  });
+
+  final int index;
+  final int activeStage;
+  final Animation<double> fade;
+  final Animation<double> breathe;
+  final Animation<double> shimmer;
+  final Color primary;
+  final bool dark;
+  final String label;
+  final String description;
+  final IconData icon;
+
+  bool get _isDone => index < activeStage;
+  bool get _isActive => index == activeStage;
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([breathe, shimmer]),
+        builder: (context, _) {
+          final labelColor = _isDone
+              ? primary
+              : _isActive
+              ? (dark ? Colors.white.withValues(alpha: 0.85) : Colors.black87)
+              : (dark ? Colors.white24 : Colors.black26);
+          final subColor = _isDone
+              ? primary.withValues(alpha: 0.55)
+              : _isActive
+              ? (dark ? Colors.white54 : Colors.black45)
+              : (dark ? Colors.white12 : Colors.black12);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                // ── Status indicator ──
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isDone
+                        ? primary.withValues(alpha: 0.12)
+                        : _isActive
+                        ? primary.withValues(alpha: 0.07 + breathe.value * 0.06)
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: _isDone
+                          ? primary.withValues(alpha: 0.5)
+                          : _isActive
+                          ? primary.withValues(alpha: 0.4 + breathe.value * 0.5)
+                          : (dark
+                                ? Colors.white.withValues(alpha: 0.10)
+                                : Colors.black.withValues(alpha: 0.10)),
+                      width: _isActive ? 2 : 1.2,
+                    ),
+                  ),
+                  child: _isDone
+                      ? Icon(Icons.check_rounded, size: 14, color: primary)
+                      : _isActive
+                      ? Center(
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: primary.withValues(
+                                alpha: 0.45 + breathe.value * 0.55,
+                              ),
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+
+                const SizedBox(width: 14),
+
+                // ── Icon ──
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: _isDone
+                      ? 0.5
+                      : _isActive
+                      ? 0.35 + shimmer.value * 0.55
+                      : 0.15,
+                  child: Icon(
+                    icon,
+                    size: 16,
+                    color: _isDone
+                        ? primary
+                        : (dark ? Colors.white70 : Colors.black54),
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                // ── Text ──
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: _isActive
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: labelColor,
+                        ),
+                        child: Text(label),
+                      ),
+                      const SizedBox(height: 1),
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w300,
+                          color: subColor,
+                        ),
+                        child: Text(
+                          _isActive ? '$description...' : description,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Refresh pipeline connector ──────────────────────────────────────────────
+
+class _RefreshPipelineConnector extends StatelessWidget {
+  const _RefreshPipelineConnector({required this.primary, required this.dark});
+  final Color primary;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 13, top: 2, bottom: 2),
+      child: Container(
+        width: 1.5,
+        height: 18,
+        color: dark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.06),
       ),
     );
   }
