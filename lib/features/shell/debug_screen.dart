@@ -829,7 +829,7 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
                 ),
               ),
               const SizedBox(height: 2),
-              Text('v1.0.0+1', style: monoStyle),
+              Text('v1.0.14+15', style: monoStyle),
               Text(fmt.format(now), style: monoStyle),
             ],
           ),
