@@ -491,225 +491,213 @@ class _BlogPage extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final dateLabel = _formatDate(entry.date);
     final primary = Theme.of(context).colorScheme.primary;
+    final readTime = _estimateReadTime(
+      entry.fullBody.isNotEmpty ? entry.fullBody : entry.summary,
+    );
+    final spotlightFacts = _buildJournalSpotlightFacts(entry);
+    final metricItems = _buildJournalMetricItems(entry.snapshot);
+    final contextItems = _buildJournalContextItems(entry.snapshot);
+    final previewText = entry.fullBody.isNotEmpty
+        ? _journalPreview(entry.fullBody)
+        : entry.summary;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 8),
-
-          // ── date & mood ──
-          Row(
-            children: [
-              Text(
-                dateLabel,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1.2,
-                  color: primary.withValues(alpha: 0.7),
-                ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: dark
+              ? [
+                  const Color(0xFF09090B),
+                  const Color(0xFF121218),
+                  const Color(0xFF09090B),
+                ]
+              : [
+                  Colors.white,
+                  primary.withValues(alpha: 0.035),
+                  const Color(0xFFF7F5F1),
+                ],
+        ),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 6),
+            _JournalHeroPanel(
+              headline: entry.headline,
+              previewText: previewText,
+              dateLabel: dateLabel,
+              moodEmoji: entry.moodEmoji,
+              moodLabel: toBeginningOfSentenceCase(entry.mood),
+              readTime: readTime,
+              badge: entry.aiGenerated
+                  ? const _AiBadge()
+                  : const _RawDataBadge(),
+              spotlightFacts: spotlightFacts,
+              action: entry.fullBody.isNotEmpty
+                  ? _JournalPrimaryButton(
+                      label: 'Read full journal',
+                      icon: Icons.menu_book_rounded,
+                      onTap: onReadMore,
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 18),
+            _JournalGlassSection(
+              eyebrow: 'The quick read',
+              title: 'What mattered most today',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.summary,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      height: 1.8,
+                      fontWeight: FontWeight.w400,
+                      color: dark ? Colors.white70 : const Color(0xFF3A3A41),
+                    ),
+                  ),
+                  if ((entry.userNote ?? '').trim().isNotEmpty ||
+                      entry.userMood != null) ...[
+                    const SizedBox(height: 18),
+                    _JournalQuoteCallout(
+                      label: entry.userMood != null
+                          ? 'Your reflection ${entry.userMood!}'
+                          : 'Your reflection',
+                      text: (entry.userNote ?? '').trim().isNotEmpty
+                          ? entry.userNote!.trim()
+                          : 'You checked in on yourself today.',
+                    ),
+                  ],
+                ],
               ),
-              const Spacer(),
-              if (entry.aiGenerated) ...[
-                const _AiBadge(),
-                const SizedBox(width: 10),
-              ] else ...[
-                const _RawDataBadge(),
-                const SizedBox(width: 10),
-              ],
-              Text(entry.moodEmoji, style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 6),
-              Text(
-                entry.mood.toUpperCase(),
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.5,
-                  color: dark ? Colors.white38 : Colors.black38,
+            ),
+            if (entry.tags.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _JournalGlassSection(
+                eyebrow: 'Keywords',
+                title: 'The themes shaping the day',
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: entry.tags.map((t) => _Tag(label: t)).toList(),
                 ),
               ),
             ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── headline ──
-          Text(
-            entry.headline,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 30,
-              fontWeight: FontWeight.w700,
-              height: 1.25,
-              color: dark ? Colors.white : Colors.black87,
+            if (metricItems.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _JournalGlassSection(
+                eyebrow: 'Body dashboard',
+                title: 'Your signals, beautifully organized',
+                child: _JournalMetricGrid(items: metricItems),
+              ),
+            ],
+            if (_hasSnapshotData(entry.snapshot)) ...[
+              const SizedBox(height: 18),
+              _JournalGlassSection(
+                eyebrow: 'At a glance',
+                title: 'The rhythm underneath the story',
+                child: _SnapshotGlance(snapshot: entry.snapshot),
+              ),
+            ],
+            if (contextItems.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _JournalGlassSection(
+                eyebrow: 'Context',
+                title: 'Where your body spent the day',
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: contextItems
+                      .map((item) => _JournalContextChip(item: item))
+                      .toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            _JournalGlassSection(
+              eyebrow: 'Inputs used',
+              title: 'Every journal is grounded in real signals',
+              child: _SensorStatusRow(snapshot: entry.snapshot),
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // ── sensor status ──
-          _SensorStatusRow(snapshot: entry.snapshot),
-
-          const SizedBox(height: 20),
-
-          // ── horizontal rule ──
-          Container(
-            width: 48,
-            height: 2,
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── summary ──
-          Text(
-            entry.summary,
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              height: 1.8,
-              fontWeight: FontWeight.w300,
-              color: dark ? Colors.white70 : Colors.black54,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // ── tags ──
-          if (entry.tags.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: entry.tags.map((t) => _Tag(label: t)).toList(),
-            ),
-
-          if (entry.tags.isNotEmpty) const SizedBox(height: 28),
-
-          // ── snapshot glance ──
-          _SnapshotGlance(snapshot: entry.snapshot),
-
-          const SizedBox(height: 28),
-
-          // ── insight reflection — personal body-mind insight ──
-          InsightReflectionCard(entry: entry),
-
-          const SizedBox(height: 28),
-
-          // ── refresh day button (today only) ──
-          if (isToday)
-            Center(
-              child: isRefreshing
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: primary.withValues(alpha: 0.5),
+            const SizedBox(height: 18),
+            InsightReflectionCard(entry: entry),
+            if (isToday) ...[
+              const SizedBox(height: 22),
+              Center(
+                child: isRefreshing
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: primary.withValues(alpha: 0.6),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Gathering your story...',
+                          const SizedBox(width: 10),
+                          Text(
+                            'Gathering a better draft…',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: dark ? Colors.white38 : Colors.black38,
+                            ),
+                          ),
+                        ],
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: onRefresh,
+                        icon: _ShimmerAiIcon(size: 15, dark: dark),
+                        label: Text(
+                          'Rewrite today',
                           style: GoogleFonts.inter(
                             fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: dark ? Colors.white38 : Colors.black38,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ],
-                    )
-                  : TextButton.icon(
-                      onPressed: onRefresh,
-                      icon: _ShimmerAiIcon(size: 14, dark: dark),
-                      label: Text(
-                        'Regenerate',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: primary.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
                           side: BorderSide(
-                            color: primary.withValues(alpha: 0.1),
+                            color: primary.withValues(alpha: 0.22),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
                           ),
                         ),
                       ),
-                    ),
-            ),
-
-          if (isToday) const SizedBox(height: 20),
-
-          // ── read more CTA ──
-          if (entry.fullBody.isNotEmpty)
+              ),
+            ],
+            const SizedBox(height: 14),
             Center(
-              child: TextButton(
-                onPressed: onReadMore,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: primary.withValues(alpha: 0.25)),
-                  ),
+              child: TextButton.icon(
+                onPressed: onViewHistory,
+                icon: Icon(
+                  Icons.history_rounded,
+                  size: 16,
+                  color: dark ? Colors.white30 : Colors.black26,
                 ),
-                child: Text(
-                  'Read full journal entry',
+                label: Text(
+                  'Open day history',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: primary,
+                    color: dark ? Colors.white38 : Colors.black38,
                   ),
                 ),
               ),
             ),
-
-          // ── version history ──
-          const SizedBox(height: 16),
-          Center(
-            child: TextButton.icon(
-              onPressed: onViewHistory,
-              icon: Icon(
-                Icons.history_rounded,
-                size: 15,
-                color: dark ? Colors.white30 : Colors.black26,
-              ),
-              label: Text(
-                'Day history',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: dark ? Colors.white38 : Colors.black38,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -723,6 +711,860 @@ class _BlogPage extends StatelessWidget {
       return 'YESTERDAY  ·  ${DateFormat('MMMM d').format(d)}';
     }
     return DateFormat('EEEE  ·  MMMM d').format(d).toUpperCase();
+  }
+}
+
+class _JournalSpotlightFact {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _JournalSpotlightFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+}
+
+class _JournalMetricItem {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? caption;
+
+  const _JournalMetricItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.caption,
+  });
+}
+
+class _JournalContextItem {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _JournalContextItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+}
+
+bool _hasSnapshotData(BodySnapshot snapshot) =>
+    snapshot.steps > 0 ||
+    snapshot.sleepHours > 0 ||
+    snapshot.avgHeartRate > 0 ||
+    snapshot.caloriesBurned > 0 ||
+    snapshot.distanceKm > 0 ||
+    snapshot.workouts > 0 ||
+    snapshot.temperatureC != null ||
+    snapshot.aqiUs != null ||
+    snapshot.uvIndex != null ||
+    snapshot.city != null ||
+    snapshot.calendarEvents.isNotEmpty;
+
+String _estimateReadTime(String text) {
+  final normalized = text.trim();
+  if (normalized.isEmpty) return '1 min read';
+  final words = normalized.split(RegExp(r'\s+')).length;
+  final minutes = math.max(1, (words / 180).ceil());
+  return '$minutes min read';
+}
+
+String _journalPreview(String text) {
+  final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (normalized.length <= 240) return normalized;
+  final cut = normalized.lastIndexOf(' ', 240);
+  final index = cut > 140 ? cut : 240;
+  return '${normalized.substring(0, index).trim()}…';
+}
+
+List<String> _storyParagraphs(String text) {
+  final paragraphs = text
+      .split(RegExp(r'\n\s*\n'))
+      .map((p) => p.trim())
+      .where((p) => p.isNotEmpty)
+      .toList();
+  if (paragraphs.isNotEmpty) return paragraphs;
+
+  final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (normalized.isEmpty) return const [];
+
+  final sentences = normalized
+      .split(RegExp(r'(?<=[.!?])\s+'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+
+  final chunks = <String>[];
+  for (var i = 0; i < sentences.length; i += 2) {
+    chunks.add(sentences.skip(i).take(2).join(' '));
+  }
+  return chunks;
+}
+
+List<_JournalSpotlightFact> _buildJournalSpotlightFacts(BodyBlogEntry entry) {
+  final snapshot = entry.snapshot;
+  final facts = <_JournalSpotlightFact>[
+    _JournalSpotlightFact(
+      icon: Icons.mood_rounded,
+      label: 'Mood',
+      value: '${entry.moodEmoji} ${toBeginningOfSentenceCase(entry.mood)}',
+    ),
+    if (snapshot.sleepHours > 0)
+      _JournalSpotlightFact(
+        icon: Icons.bedtime_rounded,
+        label: 'Sleep',
+        value: '${snapshot.sleepHours.toStringAsFixed(1)} hours',
+      ),
+    if (snapshot.steps > 0)
+      _JournalSpotlightFact(
+        icon: Icons.directions_walk_rounded,
+        label: 'Movement',
+        value: '${NumberFormat.decimalPattern().format(snapshot.steps)} steps',
+      ),
+    if (snapshot.avgHeartRate > 0)
+      _JournalSpotlightFact(
+        icon: Icons.favorite_rounded,
+        label: 'Pulse',
+        value: '${snapshot.avgHeartRate} bpm',
+      ),
+    if (snapshot.city != null && snapshot.city!.trim().isNotEmpty)
+      _JournalSpotlightFact(
+        icon: Icons.location_on_rounded,
+        label: 'Place',
+        value: snapshot.city!.trim(),
+      ),
+  ];
+  return facts.take(4).toList();
+}
+
+List<_JournalMetricItem> _buildJournalMetricItems(BodySnapshot snapshot) {
+  final items = <_JournalMetricItem>[];
+
+  if (snapshot.steps > 0) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.directions_walk_rounded,
+        label: 'Steps',
+        value: NumberFormat.decimalPattern().format(snapshot.steps),
+        caption: 'Movement through the day',
+      ),
+    );
+  }
+  if (snapshot.sleepHours > 0) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.bedtime_rounded,
+        label: 'Sleep',
+        value: '${snapshot.sleepHours.toStringAsFixed(1)} h',
+        caption: 'Recovery window',
+      ),
+    );
+  }
+  if (snapshot.avgHeartRate > 0) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.favorite_rounded,
+        label: 'Average heart rate',
+        value: '${snapshot.avgHeartRate} bpm',
+        caption: snapshot.restingHeartRate > 0
+            ? 'Resting ${snapshot.restingHeartRate} bpm'
+            : 'Cardio rhythm today',
+      ),
+    );
+  }
+  if (snapshot.caloriesBurned > 0) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.local_fire_department_rounded,
+        label: 'Calories burned',
+        value: snapshot.caloriesBurned.toStringAsFixed(0),
+        caption: 'Energy expenditure',
+      ),
+    );
+  }
+  if (snapshot.distanceKm > 0) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.route_rounded,
+        label: 'Distance',
+        value: '${snapshot.distanceKm.toStringAsFixed(1)} km',
+        caption: 'Ground covered',
+      ),
+    );
+  }
+  if (snapshot.workouts > 0) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.fitness_center_rounded,
+        label: 'Workouts',
+        value: '${snapshot.workouts}',
+        caption: 'Training sessions logged',
+      ),
+    );
+  }
+  if (snapshot.temperatureC != null) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.thermostat_rounded,
+        label: 'Temperature',
+        value: '${snapshot.temperatureC!.toStringAsFixed(0)}°C',
+        caption: snapshot.weatherDesc ?? 'Ambient conditions',
+      ),
+    );
+  }
+  if (snapshot.hrv != null) {
+    items.add(
+      _JournalMetricItem(
+        icon: Icons.monitor_heart_rounded,
+        label: 'HRV',
+        value: snapshot.hrv!.toStringAsFixed(0),
+        caption: 'Variability signal',
+      ),
+    );
+  }
+
+  return items;
+}
+
+List<_JournalContextItem> _buildJournalContextItems(BodySnapshot snapshot) {
+  final items = <_JournalContextItem>[];
+
+  if (snapshot.city != null && snapshot.city!.trim().isNotEmpty) {
+    items.add(
+      _JournalContextItem(
+        icon: Icons.location_city_rounded,
+        label: 'Location',
+        value: snapshot.city!.trim(),
+      ),
+    );
+  }
+  if (snapshot.weatherDesc != null && snapshot.weatherDesc!.trim().isNotEmpty) {
+    items.add(
+      _JournalContextItem(
+        icon: Icons.cloud_outlined,
+        label: 'Weather',
+        value: snapshot.weatherDesc!.trim(),
+      ),
+    );
+  }
+  if (snapshot.aqiUs != null) {
+    items.add(
+      _JournalContextItem(
+        icon: Icons.air_rounded,
+        label: 'Air quality',
+        value: 'AQI ${snapshot.aqiUs}',
+      ),
+    );
+  }
+  if (snapshot.uvIndex != null) {
+    items.add(
+      _JournalContextItem(
+        icon: Icons.wb_sunny_rounded,
+        label: 'UV',
+        value: snapshot.uvIndex!.toStringAsFixed(1),
+      ),
+    );
+  }
+  if (snapshot.calendarEvents.isNotEmpty) {
+    items.add(
+      _JournalContextItem(
+        icon: Icons.event_note_rounded,
+        label: 'Calendar',
+        value: snapshot.calendarEvents.length == 1
+            ? snapshot.calendarEvents.first
+            : '${snapshot.calendarEvents.length} events on deck',
+      ),
+    );
+  }
+
+  return items;
+}
+
+class _JournalHeroPanel extends StatelessWidget {
+  const _JournalHeroPanel({
+    required this.headline,
+    required this.previewText,
+    required this.dateLabel,
+    required this.moodEmoji,
+    required this.moodLabel,
+    required this.readTime,
+    required this.badge,
+    required this.spotlightFacts,
+    this.action,
+  });
+
+  final String headline;
+  final String previewText;
+  final String dateLabel;
+  final String moodEmoji;
+  final String moodLabel;
+  final String readTime;
+  final Widget badge;
+  final List<_JournalSpotlightFact> spotlightFacts;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? [
+                  const Color(0xFF1A1B22),
+                  primary.withValues(alpha: 0.18),
+                  const Color(0xFF101117),
+                ]
+              : [
+                  const Color(0xFFFFFCF8),
+                  primary.withValues(alpha: 0.12),
+                  Colors.white,
+                ],
+        ),
+        border: Border.all(
+          color: primary.withValues(alpha: dark ? 0.18 : 0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: primary.withValues(alpha: dark ? 0.18 : 0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _JournalMetaPill(
+                icon: Icons.auto_stories_rounded,
+                text: dateLabel,
+              ),
+              _JournalMetaPill(icon: Icons.schedule_rounded, text: readTime),
+              badge,
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      headline,
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                        color: dark ? Colors.white : const Color(0xFF111111),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      previewText,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        height: 1.7,
+                        fontWeight: FontWeight.w400,
+                        color: dark
+                            ? Colors.white.withValues(alpha: 0.74)
+                            : const Color(0xFF3E3B3B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                width: 74,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: (dark ? Colors.white : primary).withValues(
+                    alpha: dark ? 0.06 : 0.08,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: primary.withValues(alpha: dark ? 0.18 : 0.12),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(moodEmoji, style: const TextStyle(fontSize: 30)),
+                    const SizedBox(height: 8),
+                    Text(
+                      moodLabel,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                        color: dark
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : primary.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (spotlightFacts.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: spotlightFacts
+                  .map((fact) => _JournalSpotlightCard(fact: fact))
+                  .toList(),
+            ),
+          ],
+          if (action != null) ...[const SizedBox(height: 22), action!],
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalMetaPill extends StatelessWidget {
+  const _JournalMetaPill({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: (dark ? Colors.white : primary).withValues(
+          alpha: dark ? 0.06 : 0.08,
+        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: primary.withValues(alpha: dark ? 0.16 : 0.12),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: primary),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              color: dark ? Colors.white70 : primary.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalSpotlightCard extends StatelessWidget {
+  const _JournalSpotlightCard({required this.fact});
+
+  final _JournalSpotlightFact fact;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 136),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (dark ? Colors.white : primary).withValues(
+            alpha: dark ? 0.08 : 0.10,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: primary.withValues(alpha: dark ? 0.18 : 0.10),
+            ),
+            child: Icon(fact.icon, size: 18, color: primary),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  fact.label,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.0,
+                    color: dark ? Colors.white30 : Colors.black38,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  fact.value,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: dark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalGlassSection extends StatelessWidget {
+  const _JournalGlassSection({
+    required this.eyebrow,
+    required this.title,
+    required this.child,
+  });
+
+  final String eyebrow;
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.white.withValues(alpha: 0.035)
+            : Colors.white.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: dark
+              ? Colors.white.withValues(alpha: 0.08)
+              : primary.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          if (!dark)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
+            ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            eyebrow.toUpperCase(),
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+              color: dark ? Colors.white24 : Colors.black38,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+              color: dark ? Colors.white : const Color(0xFF181818),
+            ),
+          ),
+          const SizedBox(height: 18),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalQuoteCallout extends StatelessWidget {
+  const _JournalQuoteCallout({required this.label, required this.text});
+
+  final String label;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: dark ? 0.13 : 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: primary.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: primary.withValues(alpha: 0.78),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              height: 1.7,
+              fontStyle: FontStyle.italic,
+              color: dark ? Colors.white70 : const Color(0xFF3B3B42),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalMetricGrid extends StatelessWidget {
+  const _JournalMetricGrid({required this.items});
+
+  final List<_JournalMetricItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnCount = constraints.maxWidth > 640 ? 3 : 2;
+        final itemWidth =
+            (constraints.maxWidth - ((columnCount - 1) * 12)) / columnCount;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: items
+              .map(
+                (item) => SizedBox(
+                  width: itemWidth,
+                  child: _JournalMetricCard(item: item),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _JournalMetricCard extends StatelessWidget {
+  const _JournalMetricCard({required this.item});
+
+  final _JournalMetricItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.white.withValues(alpha: 0.04)
+            : primary.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: dark
+              ? Colors.white.withValues(alpha: 0.08)
+              : primary.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: dark ? 0.16 : 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(item.icon, size: 20, color: primary),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            item.label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.7,
+              color: dark ? Colors.white30 : Colors.black38,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.value,
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+              color: dark ? Colors.white : Colors.black87,
+            ),
+          ),
+          if (item.caption != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              item.caption!,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                height: 1.5,
+                color: dark ? Colors.white38 : Colors.black45,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalContextChip extends StatelessWidget {
+  const _JournalContextChip({required this.item});
+
+  final _JournalContextItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.025),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: dark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(item.icon, size: 16, color: primary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: dark ? Colors.white30 : Colors.black38,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                item.value,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: dark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JournalPrimaryButton extends StatelessWidget {
+  const _JournalPrimaryButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -2987,290 +3829,366 @@ class _BlogDetailPageState extends ConsumerState<_BlogDetailPage> {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
+    final metricItems = _buildJournalMetricItems(_entry.snapshot);
+    final contextItems = _buildJournalContextItems(_entry.snapshot);
+    final paragraphs = _storyParagraphs(_entry.fullBody);
+    final hasReflection =
+        (_entry.userNote != null && _entry.userNote!.trim().isNotEmpty) ||
+        _entry.userMood != null;
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // back button + date + note edit icon
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.arrow_back_rounded,
-                      color: dark ? Colors.white70 : Colors.black54,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    DateFormat('MMMM d, y').format(_entry.date),
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: dark ? Colors.white38 : Colors.black38,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    tooltip: _entry.userMood != null
-                        ? 'Edit mood & note'
-                        : (_entry.userNote != null
-                              ? 'Edit note'
-                              : 'Add mood & note'),
-                    onPressed: _showNoteEditor,
-                    icon: _entry.userMood != null
-                        ? Text(
-                            _entry.userMood!,
-                            style: const TextStyle(fontSize: 22),
-                          )
-                        : Icon(
-                            _entry.userNote != null
-                                ? Icons.edit_note_rounded
-                                : Icons.add_comment_outlined,
-                            size: 20,
-                            color: _entry.userNote != null
-                                ? primary
-                                : (dark ? Colors.white38 : Colors.black38),
-                          ),
-                  ),
-                  // AI regenerate button — today only; past entries are locked.
-                  if (_isEntryToday)
-                    _aiRegenerating
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : Tooltip(
-                            message: _entry.aiGenerated
-                                ? 'Rewrite entry'
-                                : 'Generate entry',
-                            child: IconButton(
-                              onPressed: _regenerateWithAi,
-                              icon: Icon(
-                                Icons.auto_awesome_rounded,
-                                size: 20,
-                                color: _entry.aiGenerated
-                                    ? primary
-                                    : (dark ? Colors.white38 : Colors.black38),
-                              ),
-                            ),
-                          ),
-                ],
-              ),
-            ),
-
-            // content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 16,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: dark ? const Color(0xFF09090B) : const Color(0xFFF6F4EF),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: dark
+                ? [
+                    const Color(0xFF09090B),
+                    const Color(0xFF13131A),
+                    const Color(0xFF09090B),
+                  ]
+                : [
+                    const Color(0xFFFCFBF8),
+                    primary.withValues(alpha: 0.05),
+                    const Color(0xFFF4F1EA),
+                  ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                child: Row(
                   children: [
-                    // headline
-                    Text(
-                      _entry.headline,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        height: 1.3,
-                        color: dark ? Colors.white : Colors.black87,
-                      ),
+                    _DetailTopButton(
+                      icon: Icons.arrow_back_rounded,
+                      label: 'Back',
+                      onTap: () => Navigator.of(context).pop(),
                     ),
-
-                    const SizedBox(height: 8),
-
-                    Row(
-                      children: [
-                        Text(
-                          _entry.moodEmoji,
-                          style: const TextStyle(fontSize: 18),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _entry.mood,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: primary.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        if (_aiRegenerating) ...[
-                          const SizedBox(width: 12),
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 1.5),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Writing...',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: primary.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ] else if (_entry.aiGenerated) ...[
-                          const SizedBox(width: 12),
-                          const _AiBadge(),
-                        ],
-                      ],
+                    const Spacer(),
+                    _DetailTopButton(
+                      icon: _entry.userMood != null
+                          ? null
+                          : ((_entry.userNote ?? '').trim().isNotEmpty
+                                ? Icons.edit_note_rounded
+                                : Icons.add_comment_outlined),
+                      label: _entry.userMood != null
+                          ? _entry.userMood!
+                          : ((_entry.userNote ?? '').trim().isNotEmpty
+                                ? 'Edit note'
+                                : 'Add note'),
+                      onTap: _showNoteEditor,
+                      isPrimary:
+                          (_entry.userNote ?? '').trim().isNotEmpty ||
+                          _entry.userMood != null,
                     ),
-
-                    const SizedBox(height: 20),
-                    Container(
-                      width: double.infinity,
-                      height: 1,
-                      color: dark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : Colors.black.withValues(alpha: 0.06),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // full body
-                    if (_entry.fullBody.isNotEmpty)
-                      Text(
-                        _entry.fullBody,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          height: 1.85,
-                          fontWeight: FontWeight.w300,
-                          color: dark ? Colors.white70 : Colors.black54,
-                        ),
-                      )
-                    else
-                      _PendingAiPanel(snapshot: _entry.snapshot),
-
-                    const SizedBox(height: 32),
-
-                    // tags
-                    if (_entry.tags.isNotEmpty)
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _entry.tags
-                            .map((t) => _Tag(label: t))
-                            .toList(),
-                      ),
-
-                    const SizedBox(height: 28),
-
-                    // ── sensor status ──
-                    _SensorStatusRow(snapshot: _entry.snapshot),
-
-                    // user note block
-                    if ((_entry.userNote != null &&
-                            _entry.userNote!.isNotEmpty) ||
-                        _entry.userMood != null) ...[
-                      const SizedBox(height: 32),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: primary.withValues(alpha: dark ? 0.12 : 0.07),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border(
-                            left: BorderSide(color: primary, width: 3),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                if (_entry.userMood != null) ...[
-                                  Text(
-                                    _entry.userMood!,
-                                    style: const TextStyle(fontSize: 18),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ] else ...[
-                                  Icon(
-                                    Icons.edit_note_rounded,
-                                    size: 14,
-                                    color: primary.withValues(alpha: 0.7),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                Text(
-                                  _entry.userMood != null
-                                      ? _moodLabel(_entry.userMood!)
-                                      : 'Your note',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.8,
-                                    color: primary.withValues(alpha: 0.7),
-                                  ),
+                    if (_isEntryToday) ...[
+                      const SizedBox(width: 10),
+                      _DetailTopButton(
+                        icon: _aiRegenerating
+                            ? null
+                            : Icons.auto_awesome_rounded,
+                        label: _aiRegenerating ? 'Writing…' : 'Rewrite',
+                        onTap: _aiRegenerating ? null : _regenerateWithAi,
+                        isPrimary: _entry.aiGenerated,
+                        trailing: _aiRegenerating
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
-                                const Spacer(),
-                                GestureDetector(
-                                  onTap: _showNoteEditor,
-                                  child: Icon(
-                                    Icons.edit_outlined,
-                                    size: 14,
-                                    color: dark
-                                        ? Colors.white38
-                                        : Colors.black38,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_entry.userNote != null &&
-                                _entry.userNote!.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                _entry.userNote!,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  height: 1.65,
-                                  fontStyle: FontStyle.italic,
-                                  color: dark ? Colors.white70 : Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ] else ...[
-                      const SizedBox(height: 32),
-                      GestureDetector(
-                        onTap: _showNoteEditor,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.add_comment_outlined,
-                              size: 16,
-                              color: dark ? Colors.white24 : Colors.black26,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'How are you feeling today?',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: dark ? Colors.white24 : Colors.black26,
-                              ),
-                            ),
-                          ],
-                        ),
+                              )
+                            : null,
                       ),
                     ],
-
-                    const SizedBox(height: 48),
                   ],
                 ),
               ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _JournalHeroPanel(
+                        headline: _entry.headline,
+                        previewText: _entry.summary,
+                        dateLabel: DateFormat(
+                          'EEEE · MMMM d, y',
+                        ).format(_entry.date),
+                        moodEmoji: _entry.moodEmoji,
+                        moodLabel: toBeginningOfSentenceCase(_entry.mood),
+                        readTime: _estimateReadTime(
+                          _entry.fullBody.isNotEmpty
+                              ? _entry.fullBody
+                              : _entry.summary,
+                        ),
+                        badge: _entry.aiGenerated
+                            ? const _AiBadge()
+                            : const _RawDataBadge(),
+                        spotlightFacts: _buildJournalSpotlightFacts(_entry),
+                      ),
+                      const SizedBox(height: 18),
+                      if (_entry.fullBody.isNotEmpty)
+                        _JournalGlassSection(
+                          eyebrow: 'Full journal',
+                          title: 'Settle in for the long read',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (var i = 0; i < paragraphs.length; i++) ...[
+                                Text(
+                                  paragraphs[i],
+                                  style: i == 0
+                                      ? GoogleFonts.playfairDisplay(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.7,
+                                          color: dark
+                                              ? Colors.white
+                                              : const Color(0xFF1A1A1A),
+                                        )
+                                      : GoogleFonts.inter(
+                                          fontSize: 16,
+                                          height: 1.95,
+                                          fontWeight: FontWeight.w400,
+                                          color: dark
+                                              ? Colors.white70
+                                              : const Color(0xFF3B3B42),
+                                        ),
+                                ),
+                                if (i != paragraphs.length - 1)
+                                  const SizedBox(height: 20),
+                              ],
+                            ],
+                          ),
+                        )
+                      else
+                        _JournalGlassSection(
+                          eyebrow: 'Narrative pending',
+                          title: 'The story is still taking shape',
+                          child: _PendingAiPanel(snapshot: _entry.snapshot),
+                        ),
+                      if (_entry.tags.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _JournalGlassSection(
+                          eyebrow: 'Themes',
+                          title: 'A map of what defined the day',
+                          child: Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: _entry.tags
+                                .map((tag) => _Tag(label: tag))
+                                .toList(),
+                          ),
+                        ),
+                      ],
+                      if (metricItems.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _JournalGlassSection(
+                          eyebrow: 'Signals',
+                          title: 'The body data behind the prose',
+                          child: _JournalMetricGrid(items: metricItems),
+                        ),
+                      ],
+                      if (contextItems.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _JournalGlassSection(
+                          eyebrow: 'Context',
+                          title: 'Environment, schedule, and atmosphere',
+                          child: Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: contextItems
+                                .map((item) => _JournalContextChip(item: item))
+                                .toList(),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      _JournalGlassSection(
+                        eyebrow: 'Data sources',
+                        title: 'What informed this journal entry',
+                        child: _SensorStatusRow(snapshot: _entry.snapshot),
+                      ),
+                      const SizedBox(height: 18),
+                      _JournalGlassSection(
+                        eyebrow: 'Your reflection',
+                        title: hasReflection
+                            ? 'How you answered the day back'
+                            : 'Add your voice to the record',
+                        child: hasReflection
+                            ? _JournalQuoteCallout(
+                                label: _entry.userMood != null
+                                    ? _moodLabel(_entry.userMood!)
+                                    : 'Your note',
+                                text: (_entry.userNote ?? '').trim().isNotEmpty
+                                    ? _entry.userNote!.trim()
+                                    : 'You recorded a feeling, even without a written note.',
+                              )
+                            : Align(
+                                alignment: Alignment.centerLeft,
+                                child: OutlinedButton.icon(
+                                  onPressed: _showNoteEditor,
+                                  icon: const Icon(Icons.add_comment_outlined),
+                                  label: Text(
+                                    'Add a private note',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: primary,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    side: BorderSide(
+                                      color: primary.withValues(alpha: 0.22),
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                      if (_isEntryToday) ...[
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _JournalPrimaryButton(
+                                label: hasReflection
+                                    ? 'Refine reflection'
+                                    : 'Add reflection',
+                                icon: Icons.edit_outlined,
+                                onTap: _showNoteEditor,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _aiRegenerating
+                                    ? null
+                                    : _regenerateWithAi,
+                                icon: _aiRegenerating
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.auto_awesome_rounded),
+                                label: Text(
+                                  _aiRegenerating
+                                      ? 'Writing…'
+                                      : 'Rewrite story',
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: primary,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                  side: BorderSide(
+                                    color: primary.withValues(alpha: 0.22),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailTopButton extends StatelessWidget {
+  const _DetailTopButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.isPrimary = false,
+    this.trailing,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final bool isPrimary;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isPrimary
+                ? primary.withValues(alpha: dark ? 0.18 : 0.10)
+                : (dark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: isPrimary
+                  ? primary.withValues(alpha: 0.22)
+                  : (dark ? Colors.white : Colors.black).withValues(
+                      alpha: 0.08,
+                    ),
             ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 16,
+                  color: isPrimary
+                      ? primary
+                      : (dark ? Colors.white70 : Colors.black54),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isPrimary
+                      ? primary
+                      : (dark ? Colors.white70 : Colors.black54),
+                ),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            ],
+          ),
         ),
       ),
     );
