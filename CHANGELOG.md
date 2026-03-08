@@ -5,6 +5,30 @@ All notable changes to BodyPress Flutter will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] - 2026-03-08
+
+### Added
+
+- **Patterns Transparency**: Every section on the Patterns page now has an ⓘ info button that expands an explanation panel showing how the data is sourced, computed, and what it means — full algorithmic transparency
+- **Theme–Energy Links**: New correlation card showing which recurring themes predict high or low energy (≥ 60 % threshold, ≥ 3 occurrences)
+- **Co-Occurring Themes**: Theme-pair analysis revealing behavioural clusters that appear together in the same capture (≥ 2 co-occurrences)
+- **Your Rhythms**: Circadian-rhythm strip showing capture distribution across time-of-day slots (early morning → late night)
+- **AI Pattern Insights**: Aggregated AI-discovered correlations surfaced as semantic chips with contextual icons
+- **Theme Trends**: Trend arrows (↑ emerging, ↓ fading) on Top Themes chips comparing newer vs older capture halves
+- **Energy Dots**: Dominant energy-level indicator on each theme chip
+- Staggered entrance animations (fade + slide) on all Patterns sections via `SectionCard` widget
+- `PatternAnalysis` model with full correlation extraction: theme-energy map, theme trends, time-of-day distribution, co-occurrence pairs, pattern hints, location & body-signal distributions
+
+### Changed
+
+- Refactored Patterns page to use `PatternAnalysis` model replacing inline `_PatternSummary`
+- All Patterns sections wrapped in `SectionCard` for consistent styling and info panels
+- `_FrequencyChips` enhanced with optional trend arrows and energy-dot indicators
+
+### Fixed
+
+- Overflow in `PatternHintsCard` — long hint labels now constrained with `Flexible` + ellipsis
+
 ## [1.0.11] - 2026-03-08
 
 ### Added
