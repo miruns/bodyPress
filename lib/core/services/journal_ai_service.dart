@@ -118,7 +118,35 @@ class JournalAiService {
       );
       final cleaned = _stripMarkdownFences(raw.trim());
       final json = jsonDecode(cleaned) as Map<String, dynamic>;
-      return JournalAiResult.fromJson(json);
+      final result = JournalAiResult.fromJson(json);
+
+      // Strip tags that reference health metrics the snapshot doesn't have.
+      final s = snapshotFallback;
+      final hasHealth =
+          (s != null &&
+              (s.steps > 0 ||
+                  s.sleepHours > 0 ||
+                  s.avgHeartRate > 0 ||
+                  s.caloriesBurned > 0)) ||
+          captures.any((c) => c.healthData != null);
+      if (!hasHealth) {
+        final healthRe = RegExp(
+          r'step|sleep|bpm|heart|cardio|calori|kcal|workout|exercise|km\b|mile',
+          caseSensitive: false,
+        );
+        final cleanTags = result.tags
+            .where((t) => !healthRe.hasMatch(t))
+            .toList();
+        return JournalAiResult(
+          headline: result.headline,
+          summary: result.summary,
+          fullBody: result.fullBody,
+          mood: result.mood,
+          moodEmoji: result.moodEmoji,
+          tags: cleanTags,
+        );
+      }
+      return result;
     } catch (e, st) {
       debugPrint('[JournalAiService] generation failed: $e');
       debugPrint('$st');
@@ -361,10 +389,12 @@ Based on the data above, return a single JSON object with EXACTLY these keys:
 Rules:
 - headline: 6–10 words. Vivid, personal to today's data. Not generic.
 - summary: 2–3 sentences. The emotional + physical essence of the day.
-- full_body: 200–350 words. 3–5 labelled sections (e.g. — Sleep —, — Movement —, — Heart —, — Environment —, — Your Day —). Body speaks warmly to its person.
+- full_body: 200–350 words. 3–5 labelled sections. Only include sections for data categories actually present above (e.g. skip — Sleep —, — Heart — if no health data was provided). Body speaks warmly to its person.
 - mood: exactly one of: energised, tired, active, cautious, rested, quiet, calm
 - mood_emoji: single emoji matching mood
-- tags: 4–7 short, data-driven labels (e.g. "8 420 steps", "6.5h sleep", "Clear skies", "18°C")
+- tags: 4–7 short labels derived ONLY from data actually provided above (e.g. "Clear skies", "18°C", "3 events")
+
+CRITICAL: NEVER invent, estimate, or hallucinate numbers. If no health data (steps, sleep, heart rate, calories) appears above, do NOT mention any health metrics in headline, summary, full_body, or tags. Only reference data explicitly listed above.
 
 Respond with ONLY valid JSON. No markdown fences. No explanation.
 ''';
