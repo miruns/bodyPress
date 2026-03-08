@@ -5,6 +5,7 @@ import '../models/ai_provider_config.dart';
 import 'ai_config_service.dart';
 import 'ai_service.dart';
 import 'ambient_scan_service.dart';
+import 'app_update_service.dart';
 import 'background_capture_service.dart';
 import 'ble_heart_rate_service.dart';
 import 'body_blog_service.dart';
@@ -93,6 +94,11 @@ final ambientScanServiceProvider = Provider<AmbientScanService>(
 
 final permissionServiceProvider = Provider<PermissionService>(
   (_) => PermissionService(),
+);
+
+/// Play Store in-app update checker.
+final appUpdateServiceProvider = Provider<AppUpdateService>(
+  (_) => AppUpdateService(),
 );
 
 /// [NotificationService] ships its own internal singleton; the provider just

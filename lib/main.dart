@@ -99,6 +99,15 @@ void main() async {
 
   AppRouter.init(skipOnboarding: skipOnboarding);
 
+  // Check the Play Store for a newer version (fire-and-forget).
+  unawaited(
+    container.read(appUpdateServiceProvider).checkForUpdate().catchError((
+      Object e,
+    ) {
+      debugPrint('[main] In-app update check error: $e');
+    }),
+  );
+
   // Silently warm up AI metadata for any captures that were never analyzed
   // (fire-and-forget failure during capture save, or captures pre-dating
   // this feature). Runs in the background so Patterns data is ready before
