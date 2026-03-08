@@ -15,7 +15,6 @@ import '../../shared/widgets/health_permission_card.dart';
 import '../widgets/body_harmony_ring.dart';
 import '../widgets/insight_reflection_card.dart';
 import '../widgets/social_card.dart';
-import '../widgets/vitality_wave.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Body Blog — Medium-inspired, Zen home screen
@@ -518,11 +517,6 @@ class _BlogPage extends StatelessWidget {
 
           // ── body harmony ring — radial vitals visualization ──
           BodyHarmonyRing(snapshot: entry.snapshot),
-
-          const SizedBox(height: 20),
-
-          // ── vitality wave — flowing energy visualization ──
-          VitalityWave(snapshot: entry.snapshot, mood: entry.mood),
 
           const SizedBox(height: 20),
 
