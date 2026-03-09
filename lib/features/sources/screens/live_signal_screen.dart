@@ -10,6 +10,7 @@ import '../../../core/services/ble_source_provider.dart';
 import '../../../core/services/service_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/live_signal_chart.dart';
+import '../../../core/widgets/spectral_analysis_chart.dart';
 
 /// Full-screen live signal monitor for a specific BLE source.
 ///
@@ -42,6 +43,9 @@ class _LiveSignalScreenState extends ConsumerState<LiveSignalScreen> {
   final List<SignalSample> _recordedSamples = [];
   StreamSubscription<SignalSample>? _recordSub;
   bool _isRecording = false;
+
+  // Spectral analysis toggle.
+  bool _showSpectral = false;
 
   // Demo mode — synthetic signal without real hardware.
   bool _isDemoMode = false;
@@ -239,6 +243,18 @@ class _LiveSignalScreenState extends ConsumerState<LiveSignalScreen> {
                   letterSpacing: 1.2,
                 ),
               ),
+            ),
+          if (_state == BleSourceState.streaming)
+            IconButton(
+              icon: Icon(
+                _showSpectral
+                    ? Icons.timeline_rounded
+                    : Icons.graphic_eq_rounded,
+                color: _showSpectral ? AppTheme.glow : AppTheme.aurora,
+                size: 20,
+              ),
+              tooltip: _showSpectral ? 'Time domain' : 'Spectral analysis',
+              onPressed: () => setState(() => _showSpectral = !_showSpectral),
             ),
           if (_state == BleSourceState.streaming && !_isDemoMode)
             IconButton(
@@ -477,20 +493,43 @@ class _LiveSignalScreenState extends ConsumerState<LiveSignalScreen> {
               ),
             ),
 
-          // Live chart
+          // Live chart / Spectral analysis — animated crossfade.
           Expanded(
-            child: LiveSignalChart(
-              signalStream: _isDemoMode
-                  ? _demoSignalController.stream
-                  : _service.signalStream,
-              channelDescriptors: _provider!.channelDescriptors,
-              deviceName: _isDemoMode
-                  ? 'Demo'
-                  : _service.connectedDevice?.platformName,
-              sourceName: _isDemoMode
-                  ? '${_provider!.displayName} (Demo)'
-                  : _provider!.displayName,
-              onDisconnect: _isDemoMode ? _stopDemo : _disconnect,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _showSpectral
+                  ? SpectralAnalysisChart(
+                      key: const ValueKey('spectral'),
+                      signalStream: _isDemoMode
+                          ? _demoSignalController.stream
+                          : _service.signalStream,
+                      channelDescriptors: _provider!.channelDescriptors,
+                      sampleRateHz: _provider!.sampleRateHz,
+                      deviceName: _isDemoMode
+                          ? 'Demo'
+                          : _service.connectedDevice?.platformName,
+                      sourceName: _isDemoMode
+                          ? '${_provider!.displayName} (Demo)'
+                          : _provider!.displayName,
+                      onSwitchToTimeDomain: () =>
+                          setState(() => _showSpectral = false),
+                    )
+                  : LiveSignalChart(
+                      key: const ValueKey('timedomain'),
+                      signalStream: _isDemoMode
+                          ? _demoSignalController.stream
+                          : _service.signalStream,
+                      channelDescriptors: _provider!.channelDescriptors,
+                      deviceName: _isDemoMode
+                          ? 'Demo'
+                          : _service.connectedDevice?.platformName,
+                      sourceName: _isDemoMode
+                          ? '${_provider!.displayName} (Demo)'
+                          : _provider!.displayName,
+                      onDisconnect: _isDemoMode ? _stopDemo : _disconnect,
+                    ),
             ),
           ),
         ],
