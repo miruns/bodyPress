@@ -11,7 +11,7 @@ import '../models/nutrition_log.dart';
 /// All requests are anonymous — no API key required.
 class NutritionService {
   static const _baseUrl = 'https://world.openfoodfacts.org/api/v2';
-  static const _userAgent = 'BodyPress/1.0 (Flutter) — contact@governor-hq.com';
+  static const _userAgent = 'BodyPress/1.0 (Flutter) - contact@governor-hq.com';
 
   final http.Client _client;
 
