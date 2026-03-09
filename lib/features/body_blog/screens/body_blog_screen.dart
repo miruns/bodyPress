@@ -290,7 +290,7 @@ class _BodyBlogScreenState extends ConsumerState<BodyBlogScreen> {
                           : null,
                       tooltip: 'Chat with your body',
                       icon: Icon(
-                        Icons.auto_awesome_rounded,
+                        Icons.chat_bubble_outline_rounded,
                         size: 21,
                         color: _entries.isNotEmpty
                             ? (dark
