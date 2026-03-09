@@ -128,6 +128,12 @@ const List<_MoreDestination> _moreDestinations = [
     description: 'Sensor status & data sources',
   ),
   _MoreDestination(
+    icon: Icons.psychology_alt,
+    label: 'Signal Sources',
+    route: '/sources',
+    description: 'BLE signal hardware (EEG, EMG, …)',
+  ),
+  _MoreDestination(
     icon: Icons.tune_rounded,
     label: 'Environment',
     route: '/environment',
@@ -493,17 +499,25 @@ class _MoreSheet extends ConsumerWidget {
             // ── Sensor guidance (when not healthy) ─────────────────────────────
             _SensorGuidanceBanner(ref: ref),
 
-            // ── Destination tiles ─────────────────────────────────────────────
-            ..._moreDestinations.map(
-              (dest) => _MoreTile(
-                destination: dest,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  routerContext.push(dest.route);
-                },
-                badge: dest.route == '/sensors'
-                    ? _buildSensorBadgeDot(ref)
-                    : null,
+            // ── Destination tiles (scrollable when sheet is short) ─────────
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                children: [
+                  ..._moreDestinations.map(
+                    (dest) => _MoreTile(
+                      destination: dest,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        routerContext.push(dest.route);
+                      },
+                      badge: dest.route == '/sensors'
+                          ? _buildSensorBadgeDot(ref)
+                          : null,
+                    ),
+                  ),
+                ],
               ),
             ),
 
