@@ -290,11 +290,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                           'BodyPress uses your GPS coordinates to fetch local '
                           'environmental data — weather conditions, air quality, '
                           'UV index, and altitude.\n\n'
+                          'To do this, your coordinates are sent to our '
+                          'environmental data service in real time. '
+                          'They are not stored or linked to your identity.\n\n'
                           'This helps you understand how your surroundings '
                           'influence your body and overall wellness.',
                       privacy:
-                          'Your location is never tracked, stored, or shared. '
-                          'We only read it in the moment to pull environmental data.',
+                          'Your GPS coordinates are shared with our environmental '
+                          'data service solely to retrieve local conditions '
+                          '(weather, air quality, UV, altitude). '
+                          'They are not stored, tracked, or associated with '
+                          'your account.',
                       ctaLabel: 'Allow Location',
                       onAllow: _requestLocation,
                       onSkip: _next,

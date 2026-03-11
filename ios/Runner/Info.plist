@@ -48,11 +48,11 @@
 	
 	<!-- Location Permissions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>BodyPress needs access to your location to track your activities and workouts.</string>
+	<string>BodyPress uses your GPS coordinates to fetch local environmental data — weather, air quality, UV index, and altitude. Your coordinates are sent to our environmental data service in real time and are not stored or linked to your identity.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>BodyPress needs access to your location to track your activities even when the app is in the background.</string>
+	<string>BodyPress uses your GPS coordinates to fetch local environmental data — weather, air quality, UV index, and altitude. Your coordinates are sent to our environmental data service and are not stored or linked to your identity.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>BodyPress needs access to your location to track your activities even when the app is closed.</string>
+	<string>BodyPress uses your GPS coordinates to fetch local environmental data — weather, air quality, UV index, and altitude. Your coordinates are sent to our environmental data service and are not stored or linked to your identity.</string>
 	
 	<!-- Health Data Permissions -->
 	<key>NSHealthShareUsageDescription</key>
